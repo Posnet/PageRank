@@ -91,12 +91,12 @@ void pagerank(list* plist, int ncores, int npages, int nedges, long double dampe
 
     curr = plist->head;
     prev = NULL;
-    while(curr){
-        printf("%s %.4Lf\n",curr->page->name, granks[curr->page->index]);
-        prev = curr;
-        curr = prev->next;
+     while(curr){
+         printf("%s %.4Lf\n",curr->page->name, gprevranks[curr->page->index]);
+         prev = curr;
+         curr = prev->next;
     }
-    free(granks);
+    free(temp);
     free(gprevranks);
     free(threads);
     free(plist);
