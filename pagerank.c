@@ -20,22 +20,25 @@ pthread_t * threads;
 void * get_new_rank(void * pin){
 
     long double sum;
-    int lpin = (int)pin;
+    int lpin = (int) pin;
     int start = lpin * twidth;
     int end = lpin + twidth;
     page * p;
     if (end+twidth > gnpages){
         end = gnpages;
     }
+    gnorms_t[lpin] = 0;
     for (int i = start; i < end; i++){
         sum = 0;
-        gnorms_t[i] = 0;
         p = gplist[i];
         if(p->inlinks){
             node * curr = p->inlinks->head;
             node * prev = NULL;
-            while(curr){
+            while(1){
                 sum += (gprevranks[curr->page->index]/curr->page->noutlinks);
+                if (p->inlinks->tail == curr){
+                    break;
+                }
                 prev = curr;
                 curr = prev->next;
             }
@@ -43,7 +46,7 @@ void * get_new_rank(void * pin){
         }
         granks[i] = dampratio + sum;
         sum = (granks[i] - gprevranks[i]);
-        gnorms_t[i] += (sum*sum);
+        gnorms_t[lpin] += (sum*sum);
     }
     return NULL;
 }
@@ -51,6 +54,9 @@ void * get_new_rank(void * pin){
 void pagerank(list* plist, int ncores, int npages, int nedges, long double dampener)
 {
     nthreads = npages;
+    if (nthreads > 200){
+        nthreads = 200;
+    }
     granks = (long double *)malloc(sizeof(long double)*npages);
     gprevranks = (long double *)malloc(sizeof(long double)*npages);
     threads = (pthread_t *)malloc(sizeof(pthread_t)*nthreads);
@@ -75,13 +81,12 @@ void pagerank(list* plist, int ncores, int npages, int nedges, long double dampe
     do{
         gnorm = 0;
         for (int i = 0; i < nthreads; i++){
-            int * index = &i;
-            pthread_create(&threads[i], NULL, get_new_rank, (void *) index);
+            pthread_create(&threads[i], NULL, get_new_rank, (void *) i);
         }
         for (int i = 0; i < nthreads; i++){
             pthread_join(threads[i], NULL);
         }
-        for (int i = 0; i<npages; i++){
+        for (int i = 0; i < nthreads; i++){
             gnorm += gnorms_t[i];
         }
         temp = gprevranks;
@@ -91,16 +96,20 @@ void pagerank(list* plist, int ncores, int npages, int nedges, long double dampe
 
     curr = plist->head;
     prev = NULL;
-     while(curr){
+    while (1) {
          printf("%s %.4Lf\n",curr->page->name, gprevranks[curr->page->index]);
+         if (plist->tail == curr){
+            break;
+         }
          prev = curr;
          curr = prev->next;
-    }
-    free(temp);
-    free(gprevranks);
-    free(threads);
-    free(plist);
-    free(gnorms_t);
+     }
+    //free(granks);
+    //free(gprevranks);
+    //free(gnorms_t);
+    //free(gplist);
+    //free(threads);
+    
 }
 
 /* DO NOT MODIFY BELOW THIS POINT */
