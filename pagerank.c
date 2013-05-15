@@ -75,7 +75,8 @@ void pagerank(list* plist, int ncores, int npages, int nedges, long double dampe
     do{
         gnorm = 0;
         for (int i = 0; i < nthreads; i++){
-            pthread_create(&threads[i], NULL, get_new_rank, (void *) i);
+            int * index = &i;
+            pthread_create(&threads[i], NULL, get_new_rank, (void *) index);
         }
         for (int i = 0; i < nthreads; i++){
             pthread_join(threads[i], NULL);
