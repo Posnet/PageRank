@@ -4,6 +4,7 @@
 
 #include "pagerank.h"
 
+
 long double * granks;
 long double * gprevranks;
 long double * gnorms_t;
@@ -21,14 +22,9 @@ void * get_new_rank(void * pin){
 
     long double sum;
     int lpin = (int) pin;
-    int start = lpin * twidth;
-    int end = lpin + twidth;
     page * p;
-    if (end+twidth > gnpages){
-        end = gnpages;
-    }
     gnorms_t[lpin] = 0;
-    for (int i = start; i < end; i++){
+    for (int i = lpin; i < gnpages; i += nthreads){
         sum = 0;
         p = gplist[i];
         if(p->inlinks){
@@ -54,8 +50,8 @@ void * get_new_rank(void * pin){
 void pagerank(list* plist, int ncores, int npages, int nedges, long double dampener)
 {
     nthreads = npages;
-    if (nthreads > 200){
-        nthreads = 200;
+    if (nthreads > ncores){
+        nthreads = ncores;
     }
     granks = (long double *)malloc(sizeof(long double)*npages);
     gprevranks = (long double *)malloc(sizeof(long double)*npages);
@@ -104,11 +100,11 @@ void pagerank(list* plist, int ncores, int npages, int nedges, long double dampe
          prev = curr;
          curr = prev->next;
      }
-    //free(granks);
-    //free(gprevranks);
-    //free(gnorms_t);
-    //free(gplist);
-    //free(threads);
+    free(granks);
+    free(gprevranks);
+    free(gnorms_t);
+    free(gplist);
+    free(threads);
     
 }
 
