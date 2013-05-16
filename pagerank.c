@@ -116,7 +116,13 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
             {
                 page_list->head = curr->next;
                 free(curr);
-                curr = page_list->head->next;
+                if(page_list->head)
+                {
+                    curr = page_list->head->next;
+                }else
+                {
+                    curr = NULL;
+                }
             }else
             {
                 prev->next = curr->next;
@@ -148,6 +154,8 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                     trank += (prev_rank[c->page->index]/c->page->noutlinks);
                     has_non_constants = 1;
                 }
+                p = c;
+                c = p->next;
             }
             if (has_non_constants == 0 || prev_rank[cpage->index] == trank){
                 has_converged[cpage->index] = trank/cpage->noutlinks;
@@ -157,7 +165,13 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                 {
                     page_list->head = curr->next;
                     free(curr);
-                    curr = page_list->head->next;
+                    if(page_list->head)
+                    {
+                        curr = page_list->head->next;
+                    }else
+                    {
+                        curr = NULL;
+                    }
                 }else
                 {
                     prev->next = curr->next;
