@@ -82,7 +82,7 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     node * curr = plist->head;
 
     node * prev = NULL;
-    page * cpage = NULL;
+     page * cpage = NULL;
     node * c = NULL;
     node * p = NULL;
 
