@@ -85,6 +85,7 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     if (nthreads > ncores){
         nthreads = ncores;
     }
+    nthreads = 1;
 
     double * temp;
     do{
