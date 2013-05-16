@@ -4,130 +4,199 @@
 
 #include "pagerank.h"
 
-<<<<<<< HEAD
+/////////////////////////////
+//GENERIC HELPER FUNCTIONS //
+/////////////////////////////
 
-double * granks;
-double * gprevranks;
-double * gnorms_t;
-double gdamp;
-double gnorm;
-double dampratio;
-int gnpages;
-int nthreads;
-page** gplist;
-pthread_t * threads;
+/**
+ * A memory safe version of calloc
+ * Throws error if allocation not successful
+ * @param num
+ * @param size
+ */
+void *scalloc(size_t num, size_t size)
+{
+    void *res;
+    if ((res = calloc(num, size)) == (void *)0)
+    {
+        exit(EXIT_FAILURE);
+    }
+    return res;
+}
 
+/**
+ * A memory safe version of malloc
+ * Throws error if allocation not successful
+ * @param size
+ */
+void *smalloc(size_t size)
+{
+    void *res;
+    if ((res = malloc(size)) == (void *)0)
+    {
+        exit(EXIT_FAILURE);
+    }
+    return res;
+}
 
-void * get_new_rank(void * pin){
+///////////////////////
+//MAIN PAGERANK WORK //
+///////////////////////
+/**
+ * Main pagerank function
+ * @param plist    list of pages
+ * @param ncores   number of cores
+ * @param npages   number of pages
+ * @param nedges   number of edges
+ * @param dampener dampener
+ */
+void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
+{
+    //Sanity Checks
+    // assert(plist->head != null);
+    // assert(npages > 0);
+    // assert(ncores > 0);
+    // assert(dampener > 0 && dampener < 1);
 
-    double sum;
-    int lpin = (int) pin;
-    page * p;
-    gnorms_t[lpin] = 0;
-    double prevrank;
-    for (int i = lpin; i < gnpages; i += nthreads){
-        sum = 0;
-        p = gplist[i];
-        if(p->inlinks){
-            node * curr = p->inlinks->head;
-            node * prev = NULL;
-            while(1){
-                prevrank = dampratio;
-                if(curr->page->inlinks){
-                    prevrank = gprevranks[curr->page->index];
+    //Initial inits
+    double jump_prob = ((1.0 - dampener)/npages);
+    double base_conv = 1.0/npages;
+    double norm = 0;
+    double trank = 0;
+    double temp_store = 0;
+    int has_non_constants = 0;
+
+    //saves time if only one node
+    if (npages == 1)
+    {
+        printf("%s %.4f\n", plist->head->page->name, jump_prob);
+        return;
+    }
+
+    //more inits
+    double * has_converged = (double *)smalloc((sizeof(double *))*npages);
+    double * page_rank = (double *)smalloc((sizeof(double *))*npages);
+    double * prev_rank = (double *)smalloc((sizeof(double *))*npages);
+    double * temp_rank;
+    list * page_list = page_list_create();
+    node * curr = plist->head;
+
+    node * prev = NULL;
+    page * cpage = NULL;
+    node * c = NULL;
+    node * p = NULL;
+
+    //Initial loop, explicit for speed
+    while(curr)
+    {
+        cpage = curr->page;
+        if (cpage->inlinks) //If the page isn't a dangling page.
+        {
+            has_converged[cpage->index] = 0;
+            page_list_add_end(page_list, cpage);
+            c = cpage->inlinks->head;
+            trank = 0;
+            while(c)
+            {
+                trank += base_conv/c->page->noutlinks;
+                p = c;
+                c = p->next;
+            }
+            prev_rank[cpage->index] = trank;
+            temp_store = base_conv - trank;
+            norm += temp_store * temp_store;
+            prev = curr;
+            curr = prev->next;
+        }
+        else // if the page is a dangling page.
+        {
+            prev_rank[cpage->index] = jump_prob;
+            has_converged[cpage->index] = (jump_prob/cpage->noutlinks);
+            if (page_list->head == curr)
+            {
+                page_list->head = curr->next;
+                free(curr);
+                curr = page_list->head->next;
+            }else
+            {
+                prev->next = curr->next;
+                free(curr);
+                curr = prev->next;
+            }
+        }
+    }
+
+    //Convergence loop
+    while(norm > EPSILON * EPSILON)
+    {
+        curr = page_list->head;
+        prev = NULL;
+        norm = 0;
+        while(curr)
+        {
+            cpage = curr->page;
+            has_non_constants = 0;
+            c = cpage->inlinks->head;
+            trank = 0;
+            while(c)
+            {
+                if (has_converged[c->page->index] > 0)
+                {
+                    trank += has_converged[c->page->index];
+                }else
+                {
+                    trank += (prev_rank[c->page->index]/c->page->noutlinks);
+                    has_non_constants = 1;
                 }
-                sum += (prevrank/curr->page->noutlinks);
-                if (p->inlinks->tail == curr){
-                    break;
+            }
+            if (has_non_constants == 0 || prev_rank[cpage->index] == trank){
+                has_converged[cpage->index] = trank/cpage->noutlinks;
+                prev_rank[cpage->index] = trank;
+                page_rank[cpage->index] = trank;
+                if (page_list->head == curr)
+                {
+                    page_list->head = curr->next;
+                    free(curr);
+                    curr = page_list->head->next;
+                }else
+                {
+                    prev->next = curr->next;
+                    free(curr);
+                    curr = prev->next;
                 }
+            }else
+            {
+                page_rank[cpage->index] = trank;
+                temp_store = (trank - prev_rank[cpage->index]);
+                norm += temp_store * temp_store;
                 prev = curr;
                 curr = prev->next;
             }
-            sum *= gdamp;
         }
-        granks[i] = dampratio + sum;
-        sum = (granks[i] - gprevranks[i]);
-        gnorms_t[lpin] += (sum*sum);
-    }
-    return NULL;
-}
+        temp_rank = prev_rank;
+        prev_rank = page_rank;
+        page_rank = temp_rank;
 
-void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
-{
-
-    nthreads = npages;
-    if (nthreads > ncores){
-        nthreads = ncores;
     }
-    granks = (double *)malloc(sizeof(double)*npages);
-    gprevranks = (double *)malloc(sizeof(double)*npages);
-    threads = (pthread_t *)malloc(sizeof(pthread_t)*nthreads);
-    gplist = (page **)malloc(sizeof(page *)*npages);
-    gnorms_t = (double *)malloc(sizeof(double)*nthreads);
-    dampratio = ((1 - dampener)/npages);
-    gnpages = npages;
-    gdamp = dampener;
-    node* curr;
-    node* prev;
+
+    //Printing loop
     curr = plist->head;
-    int count = 0;
-    for (int i = 0; i<npages; i++){
-        granks[i] = 1.0/npages;
-        gprevranks[i] = 1.0/npages;
-        if(curr->page->inlinks){
-            gplist[count] = curr->page;
-            curr->page->index = count;
-            count += 1;
-        }
+    while(curr){
+        printf("%s %.4f\n", curr->page->name, prev_rank[curr->page->index]);
         prev = curr;
         curr = prev->next;
     }
-    nthreads = count;
-    gnpages = count;
-    if (nthreads > ncores){
-        nthreads = ncores;
-    }
-    nthreads = 1;
 
-    double * temp;
-    do{
-        gnorm = 0;
-        for (int i = 0; i < nthreads; i++){
-            pthread_create(&threads[i], NULL, get_new_rank, (void *) i);
-        }
-        for (int i = 0; i < nthreads; i++){
-            pthread_join(threads[i], NULL);
-        }
-        for (int i = 0; i < nthreads; i++){
-            gnorm += gnorms_t[i];
-        }
-        temp = gprevranks;
-        gprevranks = granks;
-        granks = temp;
-    } while(gnorm > (EPSILON*EPSILON));
 
-    curr = plist->head;
-    prev = NULL;
-    double rank;
-    while (1) {
-        rank = dampratio;
-        if(curr->page->inlinks){
-           rank = gprevranks[curr->page->index];
-        }
-        printf("%s %.4f\n",curr->page->name, rank);
-        if (plist->tail == curr){
-           break;
-        }
-        prev = curr;
-        curr = prev->next;
-     }
-    free(granks);
-    free(gprevranks);
-    free(gnorms_t);
-    free(gplist);
-    free(threads);
-
+    //Free allocated memory
+    free(has_converged);
+    free(page_rank);
+    page_list_destroy(page_list);
 }
+
+////////////////
+//NOT MY CODE //
+////////////////
 
 /* DO NOT MODIFY BELOW THIS POINT */
 int main(void)
