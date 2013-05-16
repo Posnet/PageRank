@@ -172,6 +172,7 @@ static node* page_list_add_front(list* plist, page* p)
 
   /* assign the page */
   new_node->page = p;
+  new_node->next = NULL;
   if (plist->head == NULL) /* empty list */
   {
     plist->head = new_node;
@@ -202,6 +203,7 @@ static node* page_list_add_end(list* plist, page* p)
     return NULL;
   else /* assign the page */
     new_node->page = p;
+  new_node->next = NULL;
 
   if (plist->head == NULL) /* empty list */
   {
