@@ -146,7 +146,7 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                 c = p->next;
             }
             trank = trank * dampener;
-            if (has_non_constants == 0 || prev_rank[cpage->index] == trank){
+            if (has_non_constants == 0 ){ //|| prev_rank[cpage->index] == trank
                 has_converged[cpage->index] = (jump_prob+trank)/cpage->noutlinks;
                 prev_rank[cpage->index] = trank;
                 page_rank[cpage->index] = trank;
