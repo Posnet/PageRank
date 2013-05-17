@@ -125,14 +125,14 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     //Convergence loop
     while(norm > EPSILON * EPSILON)
     {
-            //Printing loop
-    printf("norm: %f, eps: %f\n", norm, EPSILON*EPSILON);
-    curr = plist->head;
-    while(curr){
-        printf("%s %.4f\n", curr->page->name, jump_prob + prev_rank[curr->page->index]);
-        prev = curr;
-        curr = prev->next;
-    }
+    //         //Printing loop
+    // printf("norm: %f, eps: %f\n", norm, EPSILON*EPSILON);
+    // curr = plist->head;
+    // while(curr){
+    //     printf("%s %.4f\n", curr->page->name, jump_prob + prev_rank[curr->page->index]);
+    //     prev = curr;
+    //     curr = prev->next;
+    // }
 
         curr = page_list->head;
         prev = NULL;
