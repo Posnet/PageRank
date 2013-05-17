@@ -225,9 +225,9 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     {
       next = current->next;
       //page_destroy(current->page);
-      if (current->page){
-        free(current->page);
-      }
+      // if (current->page){
+        // free(current->page);
+      // }
       free(current);
       current = next;
     }
