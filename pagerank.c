@@ -82,7 +82,7 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     node * curr = plist->head;
 
     node * prev = NULL;
-     page * cpage = NULL;
+    page * cpage = NULL;
     node * c = NULL;
     node * p = NULL;
 
@@ -99,37 +99,25 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
             while(c)
             {
                 trank += base_conv/c->page->noutlinks;
+                //printf("%s, %f, %i\n", c->page->name, trank, c->page->noutlinks);
                 p = c;
                 c = p->next;
             }
+            trank = trank * dampener;
             prev_rank[cpage->index] = trank;
+            page_rank[cpage->index] = trank;
             temp_store = base_conv - trank;
             norm += temp_store * temp_store;
-            prev = curr;
-            curr = prev->next;
+
         }
         else // if the page is a dangling page.
         {
-            prev_rank[cpage->index] = jump_prob;
+            prev_rank[cpage->index] = 0;
+            page_rank[cpage->index] = 0;
             has_converged[cpage->index] = (jump_prob/cpage->noutlinks);
-            if (page_list->head == curr)
-            {
-                page_list->head = curr->next;
-                free(curr);
-                if(page_list->head)
-                {
-                    curr = page_list->head->next;
-                }else
-                {
-                    curr = NULL;
-                }
-            }else
-            {
-                prev->next = curr->next;
-                free(curr);
-                curr = prev->next;
-            }
         }
+        prev = curr;
+        curr = prev->next;
     }
 
     //Convergence loop
@@ -157,14 +145,14 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                 p = c;
                 c = p->next;
             }
+            trank = trank * dampener;
             if (has_non_constants == 0 || prev_rank[cpage->index] == trank){
-                has_converged[cpage->index] = trank/cpage->noutlinks;
+                has_converged[cpage->index] = (jump_prob+trank)/cpage->noutlinks;
                 prev_rank[cpage->index] = trank;
                 page_rank[cpage->index] = trank;
                 if (page_list->head == curr)
                 {
                     page_list->head = curr->next;
-                    free(curr);
                     if(page_list->head)
                     {
                         curr = page_list->head->next;
@@ -175,7 +163,6 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                 }else
                 {
                     prev->next = curr->next;
-                    free(curr);
                     curr = prev->next;
                 }
             }else
@@ -196,16 +183,16 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     //Printing loop
     curr = plist->head;
     while(curr){
-        printf("%s %.4f\n", curr->page->name, prev_rank[curr->page->index]);
+        printf("%s %.4f\n", curr->page->name, jump_prob + prev_rank[curr->page->index]);
         prev = curr;
         curr = prev->next;
     }
 
 
     //Free allocated memory
-    free(has_converged);
-    free(page_rank);
-    page_list_destroy(page_list);
+    //free(has_converged);
+    //free(page_rank);
+    //page_list_destroy(page_list);
 }
 
 ////////////////
