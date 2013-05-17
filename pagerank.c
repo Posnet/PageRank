@@ -168,7 +168,6 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                     page_list->head = curr->next;
                     if(page_list->head)
                     {
-                        page_destroy(curr->page);
                         curr = page_list->head->next;
                     }else
                     {
@@ -177,7 +176,6 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                 }else
                 {
                     prev->next = curr->next;
-                    page_destroy(curr->page);
                     curr = prev->next;
                 }
             }else
@@ -205,8 +203,24 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
 
 
     // Free allocated memory
-    // free(has_converged);
-    // free(page_rank);
+    free(has_converged);
+    free(prev_rank);
+    free(temp_rank);
+
+    node* next;
+    node* current;
+    if (page_list == NULL) /* null page list */
+      return;
+
+    current = page_list->head;
+    while (current != NULL)
+    {
+      next = current->next;
+      //page_destroy(current->page);
+      free(current);
+      current = next;
+    }
+    free(page_list);
     // page_list_destroy(page_list);
 }
 
