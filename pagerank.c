@@ -205,9 +205,15 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
 
 
     // Free allocated memory
-    free(has_converged);
-    free(prev_rank);
-    free(temp_rank);
+    if(has_converged){
+        free(has_converged);
+    }
+    if(prev_rank){
+        free(prev_rank);
+    }
+    if(page_rank){
+        free(page_rank);
+    }
 
     node* next;
     node* current;
@@ -227,6 +233,7 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     }
     free(page_list);
     // page_list_destroy(page_list);
+    return;
 }
 
 ////////////////
