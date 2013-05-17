@@ -166,6 +166,7 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                 if (page_list->head == curr)
                 {
                     page_list->head = curr->next;
+                    free(curr);
                     if(page_list->head)
                     {
                         curr = page_list->head->next;
@@ -176,6 +177,7 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
                 }else
                 {
                     prev->next = curr->next;
+                    free(curr);
                     curr = prev->next;
                 }
             }else
@@ -217,6 +219,9 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     {
       next = current->next;
       //page_destroy(current->page);
+      if (current->page){
+        free(current->page);
+      }
       free(current);
       current = next;
     }
