@@ -115,6 +115,8 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
             prev_rank[cpage->index] = jump_prob;
             page_rank[cpage->index] = jump_prob;
             has_converged[cpage->index] = (jump_prob/cpage->noutlinks);
+            temp_store = base_conv - jump_prob;
+            norm += temp_store*temp_store;
         }
         prev = curr;
         curr = prev->next;
@@ -123,13 +125,14 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     //Convergence loop
     while(norm > EPSILON * EPSILON)
     {
-    //         //Printing loop
-    // curr = plist->head;
-    // while(curr){
-    //     printf("%s %.4f\n", curr->page->name, jump_prob + prev_rank[curr->page->index]);
-    //     prev = curr;
-    //     curr = prev->next;
-    // }
+            //Printing loop
+    printf("norm: %f, eps: %f\n", norm, EPSILON*EPSILON);
+    curr = plist->head;
+    while(curr){
+        printf("%s %.4f\n", curr->page->name, jump_prob + prev_rank[curr->page->index]);
+        prev = curr;
+        curr = prev->next;
+    }
 
         curr = page_list->head;
         prev = NULL;
@@ -156,6 +159,8 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
             trank = jump_prob + trank * dampener;
             if (has_non_constants == 0 ){ //|| prev_rank[cpage->index] == trank
                 has_converged[cpage->index] = (trank)/cpage->noutlinks;
+                temp_store = (trank - prev_rank[cpage->index]);
+                norm += temp_store * temp_store;
                 prev_rank[cpage->index] = trank;
                 page_rank[cpage->index] = trank;
                 if (page_list->head == curr)
@@ -197,10 +202,10 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     }
 
 
-    //Free allocated memory
-    //free(has_converged);
-    //free(page_rank);
-    //page_list_destroy(page_list);
+    // Free allocated memory
+    // free(has_converged);
+    // free(page_rank);
+    // page_list_destroy(page_list);
 }
 
 ////////////////
