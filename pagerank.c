@@ -4,6 +4,25 @@
 
 #include "pagerank.h"
 
+typedef struct SuperPage SuperPage;
+typedef struct Node Node;
+
+struct SuperPage
+{
+    int index;
+    int noutlinks;
+    double partialRank;
+    Node * inlinks;
+};
+
+struct Node
+{
+    Node * prev;
+    Node * next;
+    int type; //  tail <  0  = normal head > 0
+    SuperPage * elem;
+};
+
 /////////////////////////////
 //GENERIC HELPER FUNCTIONS //
 /////////////////////////////
@@ -14,7 +33,7 @@
  * @param num
  * @param size
  */
-void *scalloc(size_t num, size_t size)
+static void *scalloc(size_t num, size_t size)
 {
     void *res;
     if ((res = calloc(num, size)) == (void *)0)
@@ -29,7 +48,7 @@ void *scalloc(size_t num, size_t size)
  * Throws error if allocation not successful
  * @param size
  */
-void *smalloc(size_t size)
+static void *smalloc(size_t size)
 {
     void *res;
     if ((res = malloc(size)) == (void *)0)
@@ -37,6 +56,169 @@ void *smalloc(size_t size)
         exit(EXIT_FAILURE);
     }
     return res;
+}
+
+static double diff_squared(double curr, double prev){
+    double temp = curr - prev;
+    return temp*temp;
+}
+
+static SuperPage * SuperPage_create(void){
+    SuperPage * newPage = (SuperPage *)smalloc(sizeof(SuperPage));
+    newPage->index = NULL;
+    newPage->noutlinks = NULL;
+    newPage->partialRank = 0;
+    Node * inlinks;
+}
+
+static void SuperPage_free(void){
+    //TODO
+}
+
+
+//////////////////////////////
+//Linked List Access Methods//
+//////////////////////////////
+
+static Node* Node_create(void){
+    Node * n = (Node *)smalloc(sizeof(Node));
+    n->elem = NULL;
+    n->next = NULL:
+    n->prev = NULL;
+    int type = 0;
+    return n;
+}
+
+static Node* List_create(void){
+    node * head = Node_create();
+    head->type = 1;
+    return head;
+}
+
+static Node * insert_after(Node * n, SuperPage * p){
+    Node * newNode = Node_create();
+    newNode->elem = p;
+    if(n){
+        if (n->next){
+            n->next->prev = newNode;
+            newNode->next = n->next;
+            n->next = newNode;
+            newNode->prev = n;
+        }else{
+            n->next = newNode;
+            newNode->prev = n;
+        }
+    }
+    return newNode;
+}
+
+static SuperPage * delete_node(Node * n){
+    n->prev = n->next;
+    n->next = n->prev;
+    SuperPage * p = n->elem;
+    free(n);
+    return p;
+}
+
+static void Free_List(Node * head){
+    Node * n = head->next;
+    Node * t = NULL;
+    while (n){
+        t = n->next;
+        free(n);
+        n = t;
+    }
+    free(head);
+}
+
+///////////////////////////////
+//PAGE RANK GLOBAL VARIABLES //
+///////////////////////////////
+
+double * PageRank;
+double * PrevRank;
+double * TempRank;
+double * hasConverged;
+SuperPage * superPages;
+double damp;
+double pages;
+double cores;
+double edges;
+double jumpProb;
+double baseProb;
+double epsilon = EPSILON * EPSILON;
+double norm;
+
+Node * head;
+
+
+///////////////////////////////
+//PAGE RANK HELPER FUNCTIONS //
+///////////////////////////////
+
+void init_globals(int ncores, int npages, int nedges, double dampener){
+    //Init Globals
+    damp = dampener;
+    pages = npages;
+    cores = ncores;
+    edges = nedges;
+    head = List_create();
+    jumpProb = ((1.0 - damp)/pages);
+    baseProb = 1.0/npages;
+
+    PageRank = (double *)smalloc(sizeof(double)*pages);
+    PrevRank = (double *)smalloc(sizeof(double)*pages);
+    TempRank = NULL;
+    hasConverged = (double *)smalloc(sizeof(double)*pages);
+    superPages = (SuperPage *)smalloc(sizeof(SuperPage)*pages);
+    norm = 0;
+}
+
+void process_data(list* plist){
+    norm = 0;
+    Node * current = head;
+    node * curr = plist->head;
+    node * temp;
+    int index;
+    while(curr){
+        index = curr->page->index;
+        if (curr->page->inlinks){ // Not dangling page
+
+        }else{
+            PageRank[index] = jumpProb;
+            PrevRank[index] = jumpProb;
+            hasConverged[index] = (jumpProb/curr->page->noutlinks);
+            norm += diff_squared(jumpProb, baseProb);
+        }
+        temp = curr;
+        curr = temp->next;
+    }
+}
+
+Node * process_node(Node * n){
+    //TODO
+    return n;
+}
+
+void tick(void){
+    //TODO
+}
+
+void load_balance(void){
+    //TODO
+}
+
+void free_all(void){
+    //TODO
+}
+
+bool check_convergance(){
+    //TODO
+    return false;
+}
+
+void edge_cases(list* plist, int ncores, int nedges){
+    //TODO
 }
 
 ///////////////////////
@@ -52,188 +234,15 @@ void *smalloc(size_t size)
  */
 void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
 {
-    //Sanity Checks
-    // assert(plist->head != null);
-    // assert(npages > 0);
-    // assert(ncores > 0);
-    // assert(dampener > 0 && dampener < 1);
-
-    //Initial inits
-    double jump_prob = ((1.0 - dampener)/npages);
-    double base_conv = 1.0/npages;
-    double norm = 0;
-    double trank = 0;
-    double temp_store = 0;
-    int has_non_constants = 0;
-
-    //saves time if only one node
-    // if (npages == 1)
-    // {
-    //     printf("%s %.4f\n", plist->head->page->name, jump_prob);
-    //     return;
-    // }
-
-    //more inits
-    double * has_converged = (double *)smalloc((sizeof(double *))*npages);
-    double * page_rank = (double *)smalloc((sizeof(double *))*npages);
-    double * prev_rank = (double *)smalloc((sizeof(double *))*npages);
-    double * temp_rank;
-    list * page_list = page_list_create();
-    node * curr = plist->head;
-
-    node * prev = NULL;
-    page * cpage = NULL;
-    node * c = NULL;
-    node * p = NULL;
-
-    //Initial loop, explicit for speed
-    while(curr)
-    {
-        cpage = curr->page;
-        if (cpage->inlinks) //If the page isn't a dangling page.
-        {
-            has_converged[cpage->index] = 0;
-            page_list_add_end(page_list, cpage);
-            c = cpage->inlinks->head;
-            trank = 0;
-            while(c)
-            {
-                trank += base_conv/c->page->noutlinks;
-                //printf("%s, %f, %i\n", c->page->name, trank, c->page->noutlinks);
-                p = c;
-                c = p->next;
-            }
-            trank = jump_prob + trank * dampener;
-            prev_rank[cpage->index] = trank;
-            page_rank[cpage->index] = trank;
-            temp_store = base_conv - trank;
-            norm += temp_store * temp_store;
-
-        }
-        else // if the page is a dangling page.
-        {
-            prev_rank[cpage->index] = jump_prob;
-            page_rank[cpage->index] = jump_prob;
-            has_converged[cpage->index] = (jump_prob/cpage->noutlinks);
-            temp_store = base_conv - jump_prob;
-            norm += temp_store*temp_store;
-        }
-        prev = curr;
-        curr = prev->next;
+    //edge_cases(plist, ncores, npages);
+    init_globals(ncores, npages, nedges, dampener);
+    process_data(plist);
+    //load_balance();
+    while (check_convergance()){
+        tick();
     }
-
-    //Convergence loop
-    while(norm > EPSILON * EPSILON)
-    {
-    //         //Printing loop
-    // printf("norm: %f, eps: %f\n", norm, EPSILON*EPSILON);
-    // curr = plist->head;
-    // while(curr){
-    //     printf("%s %.4f\n", curr->page->name, jump_prob + prev_rank[curr->page->index]);
-    //     prev = curr;
-    //     curr = prev->next;
-    // }
-
-        curr = page_list->head;
-        prev = NULL;
-        norm = 0;
-        while(curr)
-        {
-            cpage = curr->page;
-            has_non_constants = 0;
-            c = cpage->inlinks->head;
-            trank = 0;
-            while(c)
-            {
-                if (has_converged[c->page->index] > 0)
-                {
-                    trank += has_converged[c->page->index];
-                }else
-                {
-                    trank += (prev_rank[c->page->index]/c->page->noutlinks);
-                    has_non_constants = 1;
-                }
-                p = c;
-                c = p->next;
-            }
-            trank = jump_prob + trank * dampener;
-            if (has_non_constants == 0 ){ //|| prev_rank[cpage->index] == trank
-                has_converged[cpage->index] = (trank)/cpage->noutlinks;
-                temp_store = (trank - prev_rank[cpage->index]);
-                norm += temp_store * temp_store;
-                prev_rank[cpage->index] = trank;
-                page_rank[cpage->index] = trank;
-                if (page_list->head == curr)
-                {
-                    page_list->head = curr->next;
-                    free(curr);
-                    if(page_list->head)
-                    {
-                        curr = page_list->head->next;
-                    }else
-                    {
-                        curr = NULL;
-                    }
-                }else
-                {
-                    prev->next = curr->next;
-                    free(curr);
-                    curr = prev->next;
-                }
-            }else
-            {
-                page_rank[cpage->index] = trank;
-                temp_store = (trank - prev_rank[cpage->index]);
-                norm += temp_store * temp_store;
-                prev = curr;
-                curr = prev->next;
-            }
-        }
-        temp_rank = prev_rank;
-        prev_rank = page_rank;
-        page_rank = temp_rank;
-
-    }
-
-    //Printing loop
-    curr = plist->head;
-    while(curr){
-        printf("%s %.4f\n", curr->page->name, prev_rank[curr->page->index]);
-        prev = curr;
-        curr = prev->next;
-    }
-
-
-    // Free allocated memory
-    if(has_converged){
-        free(has_converged);
-    }
-    if(prev_rank){
-        free(prev_rank);
-    }
-    if(page_rank){
-        free(page_rank);
-    }
-
-    node* next;
-    node* current;
-    if (page_list == NULL) /* null page list */
-      return;
-
-    current = page_list->head;
-    while (current != NULL)
-    {
-      next = current->next;
-      //page_destroy(current->page);
-      // if (current->page){
-        // free(current->page);
-      // }
-      free(current);
-      current = next;
-    }
-    free(page_list);
-    // page_list_destroy(page_list);
-    return;
+    print_nodes();
+    free_all();
 }
 
 ////////////////
