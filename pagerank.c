@@ -67,11 +67,11 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     int has_non_constants = 0;
 
     //saves time if only one node
-    if (npages == 1)
-    {
-        printf("%s %.4f\n", plist->head->page->name, jump_prob);
-        return;
-    }
+    // if (npages == 1)
+    // {
+    //     printf("%s %.4f\n", plist->head->page->name, jump_prob);
+    //     return;
+    // }
 
     //more inits
     double * has_converged = (double *)smalloc((sizeof(double *))*npages);
