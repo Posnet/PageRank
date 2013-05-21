@@ -14,28 +14,29 @@ typedef struct Node Node;
 //Function Prototypes
 
 /* pagerank.c */
-void *scalloc(size_t num, size_t size);
-void *smalloc(size_t size);
-double diff_squared(double curr, double prev);
 SuperPage *SuperPage_create(page *p);
-void SuperPage_free(SuperPage *p);
 Node *Node_create(void);
 Node *List_create(void);
 Node *insert_after(Node *n, int index);
 Node *delete_node(Node *n);
-void Free_List(Node *head);
 Node *get_next(void);
+void *scalloc(size_t num, size_t size);
+void *smalloc(size_t size);
+void SuperPage_free(SuperPage *p);
+void Free_List(Node *head);
 void reset_next(void);
 void init_globals(int ncores, int npages, int nedges, double dampener);
 void process_data(list *plist);
 void process_node(Node *n);
 void tick(void);
 void free_all(void);
-int check_convergance(void);
 void print_nodes(list *plist);
 void edge_cases(list *plist, int ncores, int nedges);
 void pagerank(list *plist, int ncores, int npages, int nedges, double dampener);
+double diff_squared(double curr, double prev);
 int main(void);
+int check_convergance(void);
+
 
 //Stuct Definitions
 
