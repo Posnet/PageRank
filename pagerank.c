@@ -68,7 +68,8 @@ static SuperPage * SuperPage_create(page* p){
     newPage->index = p->index;
     newPage->noutlinks = p->noutlinks;
     newPage->partialRank = 0;
-    Node * inlinks;
+    newPage->inlinks = NULL;
+    return newPage;
 }
 
 static void SuperPage_free(SuperPage * p){
@@ -85,15 +86,15 @@ static void SuperPage_free(SuperPage * p){
 
 static Node* Node_create(void){
     Node * n = (Node *)smalloc(sizeof(Node));
-    n->elem = NULL;
-    n->next = NULL:
+    n->elem = -1;
+    n->next = NULL;
     n->prev = NULL;
-    int type = 0;
+    n->type = 0;
     return n;
 }
 
 static Node* List_create(void){
-    node * head = Node_create();
+    Node * head = Node_create();
     head->type = 1;
     return head;
 }
@@ -146,7 +147,7 @@ double * PageRank;
 double * PrevRank;
 double * TempRank;
 double * hasConverged;
-SuperPage * superPages;
+SuperPage ** superPages;
 double damp;
 double pages;
 double cores;
@@ -188,13 +189,13 @@ void init_globals(int ncores, int npages, int nedges, double dampener){
     PrevRank = (double *)smalloc(sizeof(double)*pages);
     TempRank = NULL;
     hasConverged = (double *)smalloc(sizeof(double)*pages);
-    superPages = (SuperPage *)smalloc(sizeof(SuperPage)*pages);
+    superPages = (SuperPage **)smalloc(sizeof(SuperPage *)*pages);
     norm = 0;
 }
 
 void process_data(list* plist){
     norm = 0;
-    Node * current = head;
+    Node * current = Head;
     node * curr = plist->head;
     node * temp;
     node * c;
@@ -204,7 +205,8 @@ void process_data(list* plist){
         index = curr->page->index;
         if (curr->page->inlinks){ // Not dangling page
             SuperPage * newPage = SuperPage_create(curr->page);
-            superPages = newPage->index;
+            superPages[index] = newPage;
+            current = insert_after(current, index);
             newPage->inlinks = List_create();
             ptr = newPage->inlinks;
             c = curr->page->inlinks->head;
