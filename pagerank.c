@@ -183,7 +183,6 @@ void process_data(list* plist){
     node * curr = plist->head;
     node * temp;
     node * c;
-    node * t;
     Node * ptr;
     int index;
     while(curr){
@@ -194,20 +193,20 @@ void process_data(list* plist){
             newPage->inlinks = List_create();
             ptr = newPage->inlinks;
             c = curr->page->inlinks->head;
-            double rank =
+            double rank = 0;
             while(c){
                 insert_after(ptr, c->index);
-                t = c->next;
-                c = t;
+                rank += (baseProb/c->page->noutlinks);
+                c = c->next;
             }
-        }else{ // Dangling Page
+            rank = diff_squared(rank, baseProb);
+        }else{ // Dangling Pagerank
             PageRank[index] = jumpProb;
             PrevRank[index] = jumpProb;
-            hasConverged[index] = (jumpProb/curr->page->noutlinks);
+            hasConverged[index] = damp*(jumpProb/curr->page->noutlinks);
             norm += diff_squared(jumpProb, baseProb);
         }
-        temp = curr;
-        curr = temp->next;
+        curr = curr->next;
     }
 }
 
@@ -231,6 +230,15 @@ void free_all(void){
 bool check_convergance(){
     //TODO
     return false;
+}
+
+void print_nodes(plist* list){
+    node * curr = plist->head;
+    while(curr){
+        printf("%s %d\n", curr->page->name, jumpProb+PageRank[curr->page->index]);
+        curr = curr->next;
+    }
+
 }
 
 void edge_cases(list* plist, int ncores, int nedges){
@@ -257,7 +265,7 @@ void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
     while (check_convergance()){
         tick();
     }
-    print_nodes();
+    print_nodes(plist);
     free_all();
 }
 
