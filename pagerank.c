@@ -33,7 +33,7 @@ void Free_List(Node *head);
 void reset_next(void);
 void init_globals(int ncores, int npages, int nedges, double dampener);
 void process_data(list *plist);
-void process_node(Node *n);
+double process_node(Node *n);
 void tick(void);
 void free_all(void);
 void print_nodes(list *plist);
@@ -251,7 +251,11 @@ void Free_List(Node *head)
 double *PageRank;
 double *PrevRank;
 double *TempRank;
+double * thread_norm;
+double norm;
 int *hasConverged;
+int nthreads;
+int allConverged;
 double damp;
 double pages;
 double cores;
@@ -259,9 +263,12 @@ double edges;
 double jumpProb;
 double baseProb;
 double epsilon = EPSILON * EPSILON;
-double norm;
 
-
+pthread_mutex_t nextLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t delnLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t tickLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_t * threads;
+pthread_barrier_t iterLock;
 SuperPage **superPages;
 Node *Head;
 Node *globalCurr;
@@ -281,10 +288,12 @@ Node *globalCurr;
  */
 Node *get_next(void)
 {
+    pthread_mutex_lock(&nextLock);
     Node *prev = globalCurr;
     if(globalCurr){
         globalCurr = globalCurr->next;
     }
+    pthread_mutex_unlock(&nextLock);
     return prev;
 }
 
@@ -307,20 +316,25 @@ void reset_next(void)
 void init_globals(int ncores, int npages, int nedges, double dampener)
 {
     //Init Globals
+    allConverged = 0;
     damp = dampener;
     pages = npages;
     cores = ncores;
     edges = nedges;
+    norm = 0;
+    nthreads = ncores;
     Head = List_create();
     jumpProb = ((1.0 - damp) / pages);
     baseProb = 1.0 / npages;
+    pthread_barrier_init(&iterLock, NULL, nthreads);
 
+    threads = (pthread_t *)smalloc(sizeof(pthread_t)*nthreads);
     PageRank = (double *)smalloc(sizeof(double) * pages);
     PrevRank = (double *)smalloc(sizeof(double) * pages);
     TempRank = NULL;
     hasConverged = (int *)smalloc(sizeof(int) * pages);
     superPages = (SuperPage **)smalloc(sizeof(SuperPage *)*pages);
-    norm = 0;
+    thread_norm = (double *)smalloc(sizeof(double)*nthreads);
 }
 
 /**
@@ -384,7 +398,7 @@ void process_data(list *plist)
  * Update global PageRank and norm.
  * @param n node to be processed
  */
-void process_node(Node *n)
+double process_node(Node *n)
 {
     SuperPage *p = superPages[n->elem];
     double rank = 0;
@@ -408,12 +422,30 @@ void process_node(Node *n)
     rank += p->partialRank;
     rank = jumpProb + (damp * rank);
     PageRank[index] = rank;
-    norm += diff_squared(rank, PrevRank[index]);
+    double result = diff_squared(rank, PrevRank[index]);
     if (!(p->inlinks->next))
     {
+        pthread_mutex_lock(&delnLock);
         hasConverged[index] = (rank/p->noutlinks);
         PrevRank[index] = rank;
         delete_node(n);
+        pthread_mutex_unlock(&delnLock);
+    }
+    return result;
+}
+
+void * worker(void * args){
+    Node * curr = NULL;
+    int threadID = (int)args;
+    while(1){
+        if(allConverged){
+            return NULL;
+        }
+        while ((curr = get_next()))
+        {
+            thread_norm[threadID] += process_node(curr);
+        }
+        pthread_barrier_wait(&iterLock);
     }
 }
 
@@ -424,16 +456,17 @@ void process_node(Node *n)
  */
 void tick(void)
 {
-    Node *curr;
-    norm = 0;
+    pthread_mutex_lock(&tickLock);
     TempRank = PrevRank;
     PrevRank = PageRank;
     PageRank = TempRank;
     reset_next();
-    while ((curr = get_next()))
-    {
-        process_node(curr);
+    double total = 0;
+    for(int i = 0; i < nthreads; i++){
+        total += thread_norm[i];
     }
+    norm = total;
+    pthread_mutex_unlock(&tickLock);
 }
 
 /**
@@ -531,11 +564,18 @@ void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
     //edge_cases(plist, ncores, npages);
     init_globals(ncores, npages, nedges, dampener);
     process_data(plist);
+
+    for(int i = 0; i < nthreads; i++){
+        pthread_create(&threads[i], NULL, worker, (void *)i);
+    }
     // print_nodes(plist);
     while (check_convergence())
     {
         tick();
-        // print_nodes(plist);
+    }
+    allConverged = 1;
+    for(int i = 0; i < nthreads; i++){
+        pthread_join(threads[i], NULL);
     }
     print_nodes(plist);
     free_all();
