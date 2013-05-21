@@ -1,11 +1,43 @@
+//Includes
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
 
 #include "pagerank.h"
 
+//Typedefs
+
 typedef struct SuperPage SuperPage;
 typedef struct Node Node;
+
+//Function Prototypes
+
+/* pagerank.c */
+void *scalloc(size_t num, size_t size);
+void *smalloc(size_t size);
+double diff_squared(double curr, double prev);
+SuperPage *SuperPage_create(page *p);
+void SuperPage_free(SuperPage *p);
+Node *Node_create(void);
+Node *List_create(void);
+Node *insert_after(Node *n, int index);
+Node *delete_node(Node *n);
+void Free_List(Node *head);
+Node *get_next(void);
+void reset_next(void);
+void init_globals(int ncores, int npages, int nedges, double dampener);
+void process_data(list *plist);
+void process_node(Node *n);
+void tick(void);
+void free_all(void);
+int check_convergance(void);
+void print_nodes(list *plist);
+void edge_cases(list *plist, int ncores, int nedges);
+void pagerank(list *plist, int ncores, int npages, int nedges, double dampener);
+int main(void);
+
+//Stuct Definitions
 
 struct SuperPage
 {
@@ -33,7 +65,7 @@ struct Node
  * @param num
  * @param size
  */
-static void *scalloc(size_t num, size_t size)
+void *scalloc(size_t num, size_t size)
 {
     void *res;
     if ((res = calloc(num, size)) == (void *)0)
@@ -48,7 +80,7 @@ static void *scalloc(size_t num, size_t size)
  * Throws error if allocation not successful
  * @param size
  */
-static void *smalloc(size_t size)
+void *smalloc(size_t size)
 {
     void *res;
     if ((res = malloc(size)) == (void *)0)
@@ -58,12 +90,12 @@ static void *smalloc(size_t size)
     return res;
 }
 
-static double diff_squared(double curr, double prev){
+double diff_squared(double curr, double prev){
     double temp = curr - prev;
     return temp*temp;
 }
 
-static SuperPage * SuperPage_create(page* p){
+SuperPage * SuperPage_create(page* p){
     SuperPage * newPage = (SuperPage *)smalloc(sizeof(SuperPage));
     newPage->index = p->index;
     newPage->noutlinks = p->noutlinks;
@@ -72,7 +104,7 @@ static SuperPage * SuperPage_create(page* p){
     return newPage;
 }
 
-static void SuperPage_free(SuperPage * p){
+void SuperPage_free(SuperPage * p){
     if(p){
         Free_List(p->inlinks);
         free(p);
@@ -84,7 +116,7 @@ static void SuperPage_free(SuperPage * p){
 //Linked List Access Methods//
 //////////////////////////////
 
-static Node* Node_create(void){
+Node* Node_create(void){
     Node * n = (Node *)smalloc(sizeof(Node));
     n->elem = -1;
     n->next = NULL;
@@ -93,13 +125,13 @@ static Node* Node_create(void){
     return n;
 }
 
-static Node* List_create(void){
+Node* List_create(void){
     Node * head = Node_create();
     head->type = 1;
     return head;
 }
 
-static Node * insert_after(Node * n, int index){
+Node * insert_after(Node * n, int index){
     Node * newNode = Node_create();
     newNode->elem = index;
     if(n){
@@ -116,7 +148,7 @@ static Node * insert_after(Node * n, int index){
     return newNode;
 }
 
-static Node * delete_node(Node * n){
+Node * delete_node(Node * n){
     if (n->type){
         return NULL;
     }
@@ -128,7 +160,7 @@ static Node * delete_node(Node * n){
     return res;
 }
 
-static void Free_List(Node * head){
+void Free_List(Node * head){
     Node * n = head->next;
     Node * t = NULL;
     while (n){
@@ -197,7 +229,6 @@ void process_data(list* plist){
     norm = 0;
     Node * current = Head;
     node * curr = plist->head;
-    node * temp;
     node * c;
     Node * ptr;
     int index;
@@ -212,8 +243,8 @@ void process_data(list* plist){
             c = curr->page->inlinks->head;
             double rank = 0;
             while(c){
-                insert_after(ptr, c->index); //Possible remove has converged here
-                rank += (baseProb/c->page->noutlinks)
+                insert_after(ptr, c->page->index); //Possible remove has converged here
+                rank += (baseProb/c->page->noutlinks);
                 c = c->next;
             }
             norm += diff_squared(damp*rank, baseProb);
@@ -228,8 +259,9 @@ void process_data(list* plist){
 }
 
 void process_node(Node * n){
-    SuperPage p = superPages[n->elem];
+    SuperPage * p = superPages[n->elem];
     double rank = 0;
+    int index;
     Node * curr = p->inlinks->next;
     while(curr){
         index = curr->elem;
@@ -258,7 +290,7 @@ void tick(void){
     PageRank = PrevRank;
     PrevRank = TempRank;
     reset_next();
-    while(curr = get_next()){
+    while((curr = get_next())){
         process_node(curr);
     }
 }
@@ -274,7 +306,7 @@ void free_all(void){
         free(hasConverged);
     }
     if(superPages){
-        for(int i = 0; i<npages; i++){
+        for(int i = 0; i<pages; i++){
             if(superPages[i]){
                 SuperPage_free(superPages[i]);
             }
@@ -283,14 +315,14 @@ void free_all(void){
     }
 }
 
-bool check_convergance(){
+int check_convergance(){
     return (norm > epsilon);
 }
 
-void print_nodes(plist* list){
+void print_nodes(list* plist){
     node * curr = plist->head;
     while(curr){
-        printf("%s %d\n", curr->page->name, jumpProb+PageRank[curr->page->index]);
+        printf("%s %f\n", curr->page->name, jumpProb+PageRank[curr->page->index]);
         curr = curr->next;
     }
 
@@ -350,3 +382,4 @@ int main(void)
 
     return 0;
 }
+
