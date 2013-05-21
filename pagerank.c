@@ -478,7 +478,7 @@ void free_all(void)
  */
 int check_convergence()
 {
-    return (norm > epsilon && Head->next);
+    return (norm > epsilon);
 }
 
 /**
