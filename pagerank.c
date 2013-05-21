@@ -215,11 +215,11 @@ Node *delete_node(Node *n)
     {
         return NULL;
     }
-    Node *res;
+    Node *res = NULL;
     n->prev->next = n->next;
-    res = n->next;
     if (n->next)
     {
+        res = n->next;
         n->next->prev = n->prev;
     }
     free(n);
@@ -251,7 +251,7 @@ void Free_List(Node *head)
 double *PageRank;
 double *PrevRank;
 double *TempRank;
-double *hasConverged;
+int *hasConverged;
 double damp;
 double pages;
 double cores;
@@ -282,7 +282,9 @@ Node *globalCurr;
 Node *get_next(void)
 {
     Node *prev = globalCurr;
-    globalCurr = globalCurr->next;
+    if(globalCurr){
+        globalCurr = globalCurr->next;
+    }
     return prev;
 }
 
@@ -316,7 +318,7 @@ void init_globals(int ncores, int npages, int nedges, double dampener)
     PageRank = (double *)smalloc(sizeof(double) * pages);
     PrevRank = (double *)smalloc(sizeof(double) * pages);
     TempRank = NULL;
-    hasConverged = (double *)smalloc(sizeof(double) * pages);
+    hasConverged = (int *)smalloc(sizeof(int) * pages);
     superPages = (SuperPage **)smalloc(sizeof(SuperPage *)*pages);
     norm = 0;
 }
@@ -332,10 +334,11 @@ void process_data(list *plist)
 {
     norm = 0;
     Node *current = Head;
+    Node *ptr;
     node *curr = plist->head;
     node *c;
-    Node *ptr;
     int index;
+    double rank;
     while (curr)
     {
         index = curr->page->index;
@@ -347,21 +350,24 @@ void process_data(list *plist)
             newPage->inlinks = List_create();
             ptr = newPage->inlinks;
             c = curr->page->inlinks->head;
-            double rank = 0;
+            rank = 0;
             while (c)
             {
                 insert_after(ptr, c->page->index); //Possible remove has converged here
                 rank += (baseProb / c->page->noutlinks);
                 c = c->next;
             }
-            norm += diff_squared(damp * rank, baseProb);
+            rank = jumpProb + (damp * rank);
+            PageRank[index] = rank;
+            PrevRank[index] = rank;
+            norm += diff_squared(baseProb, rank);
         }
         else   // Dangling page
         {
             PageRank[index] = jumpProb;
             PrevRank[index] = jumpProb;
-            hasConverged[index] = (jumpProb / curr->page->noutlinks);
-            norm += diff_squared(jumpProb, baseProb);
+            hasConverged[index] = curr->page->noutlinks;
+            norm += diff_squared(baseProb, jumpProb);
         }
         curr = curr->next;
     }
@@ -387,22 +393,24 @@ void process_node(Node *n)
         index = curr->elem;
         if (hasConverged[index])
         {
-            p->partialRank += hasConverged[index];
+            p->partialRank += PrevRank[index]/hasConverged[index];
             curr = delete_node(curr);
         }
         else
         {
-            rank += (PrevRank[curr->elem] / superPages[index]->noutlinks);
+            rank += (PrevRank[index] / superPages[index]->noutlinks);
+            curr = curr->next;
         }
-        curr = curr->next;
     }
+    index = n->elem;
     rank += p->partialRank;
-    rank *= damp;
+    rank = jumpProb + (damp * rank);
     PageRank[index] = rank;
     norm += diff_squared(rank, PrevRank[index]);
     if (!(p->inlinks->next))
     {
-        hasConverged[index] = rank;
+        hasConverged[index] = (rank/p->noutlinks);
+        PrevRank[index] = rank;
         delete_node(n);
     }
 }
@@ -416,9 +424,9 @@ void tick(void)
 {
     Node *curr;
     norm = 0;
-    TempRank = PageRank;
-    PageRank = PrevRank;
-    PrevRank = TempRank;
+    TempRank = PrevRank;
+    PrevRank = PageRank;
+    PageRank = TempRank;
     reset_next();
     while ((curr = get_next()))
     {
@@ -465,7 +473,7 @@ void free_all(void)
  */
 int check_convergence()
 {
-    return (norm > epsilon);
+    return (norm > epsilon && Head->next);
 }
 
 /**
@@ -476,12 +484,13 @@ int check_convergence()
 void print_nodes(list *plist)
 {
     node *curr = plist->head;
+    // printf("n: %f\n", norm);
     while (curr)
     {
-        printf("%s %f\n", curr->page->name, jumpProb + PageRank[curr->page->index]);
+        printf("%s %.4f\n", curr->page->name, PageRank[curr->page->index]);
         curr = curr->next;
     }
-
+    // printf("\n");
 }
 
 /**
@@ -517,9 +526,11 @@ void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
     //edge_cases(plist, ncores, npages);
     init_globals(ncores, npages, nedges, dampener);
     process_data(plist);
+    // print_nodes(plist);
     while (check_convergence())
     {
         tick();
+        // print_nodes(plist);
     }
     print_nodes(plist);
     free_all();
