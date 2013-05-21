@@ -153,6 +153,7 @@ double epsilon = EPSILON * EPSILON;
 double norm;
 
 Node * head;
+Node * lockNode;
 
 
 ///////////////////////////////
