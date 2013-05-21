@@ -451,6 +451,9 @@ void free_all(void)
     {
         free(hasConverged);
     }
+    if(Head){
+        Free_List(Head);
+    }
     if (superPages)
     {
         for (int i = 0; i < pages; i++)
