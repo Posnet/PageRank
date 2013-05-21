@@ -194,6 +194,7 @@ void process_data(list* plist){
             newPage->inlinks = List_create();
             ptr = newPage->inlinks;
             c = curr->page->inlinks->head;
+            double rank =
             while(c){
                 insert_after(ptr, c->index);
                 t = c->next;
