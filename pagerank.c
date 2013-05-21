@@ -20,7 +20,7 @@ struct Node
     Node * prev;
     Node * next;
     int type; //  tail <  0  = normal head > 0
-    SuperPage * elem;
+    int elem;
 };
 
 /////////////////////////////
@@ -63,10 +63,10 @@ static double diff_squared(double curr, double prev){
     return temp*temp;
 }
 
-static SuperPage * SuperPage_create(void){
+static SuperPage * SuperPage_create(page* p){
     SuperPage * newPage = (SuperPage *)smalloc(sizeof(SuperPage));
-    newPage->index = NULL;
-    newPage->noutlinks = NULL;
+    newPage->index = p->index;
+    newPage->noutlinks = p->noutlinks;
     newPage->partialRank = 0;
     Node * inlinks;
 }
@@ -95,9 +95,9 @@ static Node* List_create(void){
     return head;
 }
 
-static Node * insert_after(Node * n, SuperPage * p){
+static Node * insert_after(Node * n, int index){
     Node * newNode = Node_create();
-    newNode->elem = p;
+    newNode->elem = index;
     if(n){
         if (n->next){
             n->next->prev = newNode;
@@ -113,6 +113,9 @@ static Node * insert_after(Node * n, SuperPage * p){
 }
 
 static SuperPage * delete_node(Node * n){
+    if (n->type){
+        return NULL;
+    }
     n->prev = n->next;
     n->next = n->prev;
     SuperPage * p = n->elem;
@@ -179,12 +182,24 @@ void process_data(list* plist){
     Node * current = head;
     node * curr = plist->head;
     node * temp;
+    node * c;
+    node * t;
+    Node * ptr;
     int index;
     while(curr){
         index = curr->page->index;
         if (curr->page->inlinks){ // Not dangling page
-
-        }else{
+            SuperPage * newPage = SuperPage_create(curr->page);
+            superPages = newPage->index;
+            newPage->inlinks = List_create();
+            ptr = newPage->inlinks;
+            c = curr->page->inlinks->head;
+            while(c){
+                insert_after(ptr, c->index);
+                t = c->next;
+                c = t;
+            }
+        }else{ // Dangling Page
             PageRank[index] = jumpProb;
             PrevRank[index] = jumpProb;
             hasConverged[index] = (jumpProb/curr->page->noutlinks);
