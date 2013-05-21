@@ -360,12 +360,14 @@ void process_data(list *plist)
             rank = jumpProb + (damp * rank);
             PageRank[index] = rank;
             PrevRank[index] = rank;
+            hasConverged[index] = 0;
             norm += diff_squared(baseProb, rank);
         }
         else   // Dangling page
         {
             PageRank[index] = jumpProb;
             PrevRank[index] = jumpProb;
+            superPages[index] = NULL;
             hasConverged[index] = curr->page->noutlinks;
             norm += diff_squared(baseProb, jumpProb);
         }
