@@ -8,41 +8,6 @@
 
 #include "pagerank.h"
 
-/////////////////////////////
-//GENERIC HELPER FUNCTIONS //
-/////////////////////////////
-
-/**
- * A memory safe version of calloc
- * Throws error if allocation not successful
- * @param num
- * @param size
- */
-void *scalloc(size_t num, size_t size)
-{
-    void *res;
-    if ((res = calloc(num, size)) == (void *)0)
-    {
-        exit(EXIT_FAILURE);
-    }
-    return res;
-}
-
-/**
- * A memory safe version of malloc
- * Throws error if allocation not successful
- * @param size
- */
-void *smalloc(size_t size)
-{
-    void *res;
-    if ((res = malloc(size)) == (void *)0)
-    {
-        exit(EXIT_FAILURE);
-    }
-    return res;
-}
-
 ///////////////////////////////
 //PAGE RANK GLOBAL VARIABLES //
 ///////////////////////////////
@@ -51,6 +16,7 @@ double *PageRank;
 double *PrevRank;
 double *TempRank;
 double *hasConverged;
+double *partialSum;
 int *outlinks;
 int **nodes;
 int realPages;
@@ -112,12 +78,12 @@ void init_globals(int ncores, int npages, int nedges, double dampener)
     jumpProb = ((1.0 - damp) / pages);
     baseProb = 1.0 / npages;
 
-    PageRank = (double *)smalloc(sizeof(double) * pages);
-    PrevRank = (double *)smalloc(sizeof(double) * pages);
+    PageRank = (double *)malloc(sizeof(double) * pages);
+    PrevRank = (double *)malloc(sizeof(double) * pages);
     TempRank = NULL;
-    hasConverged = (double *)smalloc(sizeof(double) * pages);
-    outlinks = (int *)smalloc(sizeof(int) * pages);
-    nodes = (int **)smalloc(sizeof(int *) * pages);
+    hasConverged = (double *)malloc(sizeof(double) * pages);
+    outlinks = (int *)malloc(sizeof(int) * pages);
+    nodes = (int **)malloc(sizeof(int *) * pages);
     norm = 0;
 }
 
@@ -148,7 +114,7 @@ void process_data(list *plist)
             c = curr->page->inlinks->head;
             nlinks = curr->page->inlinks->length;
             outlinks[index] = noutlinks;
-            links = (int *)smalloc(sizeof(int)*(nlinks+2));
+            links = (int *)malloc(sizeof(int)*(nlinks+2));
             links[0] = index;
             links[1] = nlinks;
             rank = 0;
@@ -188,9 +154,9 @@ void process_data(list *plist)
  * Update global PageRank and norm.
  * @param n node to be processed
  */
-double process_node(int page)
+double process_node(int p)
 {
-    int * links = nodes[page];
+    int * links = nodes[p];
     int index = links[0];
     int nlinks = links[1];
     int c;
@@ -198,16 +164,24 @@ double process_node(int page)
     for(int i = 2; i < nlinks+2; i++){
         c = links[i];
         if((hasConverged[c])){
-            rank += hasConverged[c];
+            partialSum[c] += hasConverged[c];
+            links[i] = links[nlinks+1];
+            links[1]--;
         }else{
             rank += (PrevRank[c]/outlinks[c]);
         }
     }
-    rank *= damp;
-    rank += jumpProb;
+    rank = jumpProb + (damp*rank);
     PageRank[index] = rank;
+    if(!(links[1])){
+        free(nodes[p]);
+        nodes[p] = nodes[realPages-1];
+        realPages--;
+        hasConverged[index] = rank/outlinks[index];
+        PrevRank[index] = rank;
+    }
     rank = rank - PrevRank[index];
-    return rank*rank;
+    return  rank * rank;
 }
 
 /**
@@ -307,7 +281,7 @@ void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
     do{
         tick();
         // print_nodes(plist);
-    } while ((*(long int*)&epsilon < *(long int*)&norm));
+    } while ((*(long int*)&epsilon < *(long int*)&norm) && realPages);
     // }while(norm > epsilon);
     print_nodes(plist);
     free_all();
