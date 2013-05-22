@@ -1,131 +1,549 @@
+/////////////
+//Includes //
+/////////////
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
 
 #include "pagerank.h"
 
+/////////////////////
+//Type Definitions //
+/////////////////////
 
-double * granks;
-double * gprevranks;
-double * gnorms_t;
-double gdamp;
-double gnorm;
-double dampratio;
-int gnpages;
-int nthreads;
-page** gplist;
-pthread_t * threads;
+typedef struct SuperPage SuperPage;
+typedef struct Node Node;
+
+////////////////////////
+//Function Prototypes //
+////////////////////////
+
+/* pagerank.c */
+SuperPage *SuperPage_create(page *p);
+Node *Node_create(void);
+Node *List_create(void);
+Node *insert_after(Node *n, int index);
+Node *delete_node(Node *n);
+Node *get_next(void);
+void *scalloc(size_t num, size_t size);
+void *smalloc(size_t size);
+void SuperPage_free(SuperPage *p);
+void Free_List(Node *head);
+void reset_next(void);
+void init_globals(int ncores, int npages, int nedges, double dampener);
+void process_data(list *plist);
+void process_node(Node *n);
+void tick(void);
+void free_all(void);
+void print_nodes(list *plist);
+void edge_cases(list *plist, int ncores, int nedges);
+void pagerank(list *plist, int ncores, int npages, int nedges, double dampener);
+double diff_squared(double curr, double prev);
+int main(void);
+int check_convergance(void);
 
 
-void * get_new_rank(void * pin){
+//////////////////////
+//Stuct Definitions //
+//////////////////////
 
-    double sum;
-    int lpin = (int) pin;
-    page * p;
-    gnorms_t[lpin] = 0;
-    double prevrank;
-    for (int i = lpin; i < gnpages; i += nthreads){
-        sum = 0;
-        p = gplist[i];
-        if(p->inlinks){
-            node * curr = p->inlinks->head;
-            node * prev = NULL;
-            while(1){
-                prevrank = dampratio;
-                if(curr->page->inlinks){
-                    prevrank = gprevranks[curr->page->index];
-                }
-                sum += (prevrank/curr->page->noutlinks);
-                if (p->inlinks->tail == curr){
-                    break;
-                }
-                prev = curr;
-                curr = prev->next;
-            }
-            sum *= gdamp;
-        }
-        granks[i] = dampratio + sum;
-        sum = (granks[i] - gprevranks[i]);
-        gnorms_t[lpin] += (sum*sum);
-    }
-    return NULL;
-}
-
-void pagerank(list* plist, int ncores, int npages, int nedges, double dampener)
+struct SuperPage
 {
-    nthreads = npages;
-    if (nthreads > ncores){
-        nthreads = ncores;
-    }
-    granks = (double *)malloc(sizeof(double)*npages);
-    gprevranks = (double *)malloc(sizeof(double)*npages);
-    threads = (pthread_t *)malloc(sizeof(pthread_t)*nthreads);
-    gplist = (page **)malloc(sizeof(page *)*npages);
-    gnorms_t = (double *)malloc(sizeof(double)*nthreads);
-    dampratio = ((1 - dampener)/npages);
-    gnpages = npages;
-    gdamp = dampener;
-    node* curr;
-    node* prev;
-    curr = plist->head;
-    int count = 0;
-    for (int i = 0; i<npages; i++){
-        granks[i] = 1.0/npages;
-        gprevranks[i] = 1.0/npages;
-        if(curr->page->inlinks){
-            gplist[count] = curr->page;
-            curr->page->index = count;
-            count += 1;
-        }
-        prev = curr;
-        curr = prev->next;
-    }
-    nthreads = count;
-    gnpages = count;
-    if (nthreads > ncores){
-        nthreads = ncores;
-    }
-    nthreads = 1;
+    int index;
+    int noutlinks;
+    double partialRank;
+    Node *inlinks;
+};
 
-    double * temp;
-    do{
-        gnorm = 0;
-        for (int i = 0; i < nthreads; i++){
-            pthread_create(&threads[i], NULL, get_new_rank, (void *) i);
-        }
-        for (int i = 0; i < nthreads; i++){
-            pthread_join(threads[i], NULL);
-        }
-        for (int i = 0; i < nthreads; i++){
-            gnorm += gnorms_t[i];
-        }
-        temp = gprevranks;
-        gprevranks = granks;
-        granks = temp;
-    } while(gnorm > (EPSILON*EPSILON));
+struct Node
+{
+    Node *prev;
+    Node *next;
+    int type; //  tail <  0  = normal head > 0
+    int elem;
+};
 
-    curr = plist->head;
-    prev = NULL;
-    double rank;
-    while (1) {
-        rank = dampratio;
-        if(curr->page->inlinks){
-           rank = gprevranks[curr->page->index];
-        }
-        printf("%s %.4f\n",curr->page->name, rank);
-        if (plist->tail == curr){
-           break;
-        }
-        prev = curr;
-        curr = prev->next;
-     }
-    free(granks);
-    free(gprevranks);
-    free(gnorms_t);
-    free(gplist);
-    free(threads);
+/////////////////////////////
+//GENERIC HELPER FUNCTIONS //
+/////////////////////////////
 
+/**
+ * A memory safe version of calloc
+ * Throws error if allocation not successful
+ * @param num
+ * @param size
+ */
+void *scalloc(size_t num, size_t size)
+{
+    void *res;
+    if ((res = calloc(num, size)) == (void *)0)
+    {
+        exit(EXIT_FAILURE);
+    }
+    return res;
 }
+
+/**
+ * A memory safe version of malloc
+ * Throws error if allocation not successful
+ * @param size
+ */
+void *smalloc(size_t size)
+{
+    void *res;
+    if ((res = malloc(size)) == (void *)0)
+    {
+        exit(EXIT_FAILURE);
+    }
+    return res;
+}
+
+/**
+ * Simple function to calculate the square of
+ * the difference of 2 number
+ * @param  curr current rank
+ * @param  prev previous rank
+ * @return      difference squared
+ */
+double diff_squared(double curr, double prev)
+{
+    double temp = curr - prev;
+    return temp * temp;
+}
+
+/**
+ * Initialises and Allocated memory for a new
+ * Superpage
+ * @param  p the page being copied
+ * @return   new super page pointer
+ */
+SuperPage *SuperPage_create(page *p)
+{
+    SuperPage *newPage = (SuperPage *)smalloc(sizeof(SuperPage));
+    newPage->index = p->index;
+    newPage->noutlinks = p->noutlinks;
+    newPage->partialRank = 0;
+    newPage->inlinks = NULL;
+    return newPage;
+}
+
+/**
+ * frees a given SuperPage's memory
+ * @param p the page to be freed
+ */
+void SuperPage_free(SuperPage *p)
+{
+    if (p)
+    {
+        Free_List(p->inlinks);
+        free(p);
+    }
+}
+
+
+//////////////////////////////
+//Linked List Access Methods//
+//////////////////////////////
+
+/**
+ * Initialises and allocates
+ * a new Node
+ * @param  void
+ * @return      new Node pointer
+ */
+Node *Node_create(void)
+{
+    Node *n = (Node *)smalloc(sizeof(Node));
+    n->elem = -1;
+    n->next = NULL;
+    n->prev = NULL;
+    n->type = 0;
+    return n;
+}
+
+/**
+ * Creates a new doubly linked list
+ * @param  void
+ * @return      returns the new virtual head node
+ */
+Node *List_create(void)
+{
+    Node *head = Node_create();
+    head->type = 1;
+    return head;
+}
+
+/**
+ * Inserts a node after a given node
+ * @param  n     Node to be inserted after
+ * @param  index the elem value of the new Node
+ * @return       returns a pointer to the new Node
+ */
+Node *insert_after(Node *n, int index)
+{
+    Node *newNode = Node_create();
+    newNode->elem = index;
+    if (n)
+    {
+        if (n->next)
+        {
+            n->next->prev = newNode;
+            newNode->next = n->next;
+            n->next = newNode;
+            newNode->prev = n;
+        }
+        else
+        {
+            n->next = newNode;
+            newNode->prev = n;
+        }
+    }
+    return newNode;
+}
+
+/**
+ * Deletes a given Node and frees it
+ * @param  n Node to be deleted
+ * @return   returns the Node after the one being
+ * deleted, if at the end of the list returns NULL
+ * If the node is the head of the list return NULL
+ */
+Node *delete_node(Node *n)
+{
+    if (n->type)
+    {
+        return NULL;
+    }
+    Node *res = NULL;
+    n->prev->next = n->next;
+    if (n->next)
+    {
+        res = n->next;
+        n->next->prev = n->prev;
+    }
+    free(n);
+    return res;
+}
+
+/**
+ * Frees all the nodes and the virtual head
+ * of a given list
+ * @param head head of list to be freed
+ */
+void Free_List(Node *head)
+{
+    Node *n = head->next;
+    Node *t = NULL;
+    while (n)
+    {
+        t = n->next;
+        free(n);
+        n = t;
+    }
+    free(head);
+}
+
+///////////////////////////////
+//PAGE RANK GLOBAL VARIABLES //
+///////////////////////////////
+
+double *PageRank;
+double *PrevRank;
+double *TempRank;
+int *hasConverged;
+double damp;
+double pages;
+double cores;
+double edges;
+double jumpProb;
+double baseProb;
+double epsilon = EPSILON * EPSILON;
+double norm;
+
+
+SuperPage **superPages;
+Node *Head;
+Node *globalCurr;
+
+
+///////////////////////////////
+//PAGE RANK HELPER FUNCTIONS //
+///////////////////////////////
+
+/**
+ * A global get next node method for the main
+ * linked list of pagerank nodes. Stores itself as
+ * the next node of the one being returned to prevent
+ * deletion.
+ * @param  void
+ * @return      Next Node
+ */
+Node *get_next(void)
+{
+    Node *prev = globalCurr;
+    if(globalCurr){
+        globalCurr = globalCurr->next;
+    }
+    return prev;
+}
+
+/**
+ * Resets the global node pointer to the head
+ * of the list
+ */
+void reset_next(void)
+{
+    globalCurr = Head->next;
+}
+
+/**
+ * Declare and allocate required global variables
+ * @param ncores   number of cores
+ * @param npages   number of pages
+ * @param nedges   number of edges
+ * @param dampener dampener ratio
+ */
+void init_globals(int ncores, int npages, int nedges, double dampener)
+{
+    //Init Globals
+    damp = dampener;
+    pages = npages;
+    cores = ncores;
+    edges = nedges;
+    Head = List_create();
+    jumpProb = ((1.0 - damp) / pages);
+    baseProb = 1.0 / npages;
+
+    PageRank = (double *)smalloc(sizeof(double) * pages);
+    PrevRank = (double *)smalloc(sizeof(double) * pages);
+    TempRank = NULL;
+    hasConverged = (int *)smalloc(sizeof(int) * pages);
+    superPages = (SuperPage **)smalloc(sizeof(SuperPage *)*pages);
+    norm = 0;
+}
+
+/**
+ * Initialises the global PageRank linked list
+ * Initialises the base values of PageRank
+ * Does not add constant nodes to the linked list
+ * generates the initial normal value
+ * @param plist list of pages to be processed
+ */
+void process_data(list *plist)
+{
+    norm = 0;
+    Node *current = Head;
+    Node *ptr;
+    node *curr = plist->head;
+    node *c;
+    int index;
+    double rank;
+    while (curr)
+    {
+        index = curr->page->index;
+        if (curr->page->inlinks)  // Not dangling page
+        {
+            SuperPage *newPage = SuperPage_create(curr->page);
+            superPages[index] = newPage;
+            current = insert_after(current, index);
+            newPage->inlinks = List_create();
+            ptr = newPage->inlinks;
+            c = curr->page->inlinks->head;
+            rank = 0;
+            while (c)
+            {
+                insert_after(ptr, c->page->index); //Possible remove has converged here
+                rank += (baseProb / c->page->noutlinks);
+                c = c->next;
+            }
+            rank = jumpProb + (damp * rank);
+            PageRank[index] = rank;
+            PrevRank[index] = rank;
+            hasConverged[index] = 0;
+            norm += diff_squared(baseProb, rank);
+        }
+        else   // Dangling page
+        {
+            PageRank[index] = jumpProb;
+            PrevRank[index] = jumpProb;
+            superPages[index] = NULL;
+            hasConverged[index] = curr->page->noutlinks;
+            norm += diff_squared(baseProb, jumpProb);
+        }
+        curr = curr->next;
+    }
+}
+
+/**
+ * Process and individual node.
+ * If the node has only constant inlinks delete from main list
+ * and store value in hasConverges array.
+ * If individual inlink is constant, add its value to partial
+ * Rank and delete in from the inlinks list.
+ * Update global PageRank and norm.
+ * @param n node to be processed
+ */
+void process_node(Node *n)
+{
+    SuperPage *p = superPages[n->elem];
+    double rank = 0;
+    int index;
+    Node *curr = p->inlinks->next;
+    while (curr)
+    {
+        index = curr->elem;
+        if (hasConverged[index])
+        {
+            p->partialRank += PrevRank[index]/hasConverged[index];
+            curr = delete_node(curr);
+        }
+        else
+        {
+            rank += (PrevRank[index] / superPages[index]->noutlinks);
+            curr = curr->next;
+        }
+    }
+    index = n->elem;
+    rank += p->partialRank;
+    rank = jumpProb + (damp * rank);
+    PageRank[index] = rank;
+    norm += diff_squared(rank, PrevRank[index]);
+    if (!(p->inlinks->next))
+    {
+        hasConverged[index] = (rank/p->noutlinks);
+        PrevRank[index] = rank;
+        delete_node(n);
+    }
+}
+
+/**
+ * Single parse through global node list.
+ * Process every node.
+ * rotate current and previous PageRanks.
+ */
+void tick(void)
+{
+    Node *curr;
+    norm = 0;
+    TempRank = PrevRank;
+    PrevRank = PageRank;
+    PageRank = TempRank;
+    reset_next();
+    while ((curr = get_next()))
+    {
+        process_node(curr);
+    }
+}
+
+/**
+ * Free all allocated data.
+ */
+void free_all(void)
+{
+    if (PageRank)
+    {
+        free(PageRank);
+    }
+    if (PrevRank)
+    {
+        free(PrevRank);
+    }
+    if (hasConverged)
+    {
+        free(hasConverged);
+    }
+    if(Head){
+        Free_List(Head);
+    }
+    if (superPages)
+    {
+        for (int i = 0; i < pages; i++)
+        {
+            if (superPages[i])
+            {
+                SuperPage_free(superPages[i]);
+            }
+        }
+        free(superPages);
+    }
+}
+
+/**
+ * Check the convergence of the ranks, by
+ * comparing the epsilon value to the normal
+ * square difference sum
+ * @return return 1 if not converges
+ * otherwise 0
+ */
+int check_convergence()
+{
+    return (norm > epsilon);
+}
+
+/**
+ * helper function to print nodes in plist
+ * uses global pagerank to find result values.
+ * @param plist page_list to be printed
+ */
+void print_nodes(list *plist)
+{
+    node *curr = plist->head;
+    // printf("n: %f\n", norm);
+    while (curr)
+    {
+        printf("%s %.4f\n", curr->page->name, PageRank[curr->page->index]);
+        curr = curr->next;
+    }
+    // printf("\n");
+}
+
+/**
+ * accounts for simple edge cases to avoid unnecessary
+ * calculations.
+ * No Nodes
+ * No edges
+ * Single Node
+ * @param plist  list of pages to be printed
+ * @param npages number of pages in graph
+ * @param nedges number of edges in graph
+ */
+void edge_cases(list *plist, int npages, int nedges)
+{
+    //TODO
+}
+
+
+///////////////////////
+//MAIN PAGERANK WORK //
+///////////////////////
+
+/**
+ * Main pagerank function
+ * @param plist    list of pages
+ * @param ncores   number of cores
+ * @param npages   number of pages
+ * @param nedges   number of edges
+ * @param dampener dampener
+ */
+void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
+{
+    //edge_cases(plist, ncores, npages);
+    init_globals(ncores, npages, nedges, dampener);
+    process_data(plist);
+    // print_nodes(plist);
+    while (check_convergence())
+    {
+        tick();
+        // print_nodes(plist);
+    }
+    print_nodes(plist);
+    free_all();
+}
+
+////////////////
+//NOT MY CODE //
+////////////////
 
 /* DO NOT MODIFY BELOW THIS POINT */
 int main(void)
@@ -135,7 +553,7 @@ int main(void)
      */
 
     double damping_factor;
-    list* plist = NULL;
+    list *plist = NULL;
     int ncores, npages, nedges;
 
     /* read the input into the appropriate variables and populate the list of pages */

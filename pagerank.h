@@ -214,6 +214,8 @@ static node* page_list_add_end(list* plist, page* p)
   {
     plist->tail->next = new_node;
     plist->tail = new_node;
+    new_node->next = NULL;
+
   }
   plist->length++;
 
