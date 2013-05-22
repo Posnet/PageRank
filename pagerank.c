@@ -50,9 +50,9 @@ void *smalloc(size_t size)
 double *PageRank;
 double *PrevRank;
 double *TempRank;
-int * hasConverged;
-int * outlinks;
-int ** inlinks;
+double *hasConverged;
+int *outlinks;
+int **nodes;
 int realPages;
 double damp;
 double pages;
@@ -115,7 +115,7 @@ void init_globals(int ncores, int npages, int nedges, double dampener)
     PrevRank = (double *)smalloc(sizeof(double) * pages);
     TempRank = NULL;
     hasConverged = (double *)smalloc(sizeof(double) * pages);
-    noutlinks = (int *)smalloc(sizeof(int) * pages);
+    outlinks = (int *)smalloc(sizeof(int) * pages);
     nodes = (int **)smalloc(sizeof(int *) * pages);
     norm = 0;
 }
@@ -133,6 +133,10 @@ void process_data(list *plist)
     node *c;
     int index;
     int p = 0;
+    int noutlinks;
+    int count;
+    int nlinks;
+    int *links;
     double rank;
     while (curr)
     {
@@ -143,19 +147,19 @@ void process_data(list *plist)
             c = curr->page->inlinks->head;
             nlinks = curr->page->inlinks->length;
             outlinks[index] = noutlinks;
-            int * links = smalloc(sizeof(int)*(nlinks+2));
+            links = (int *)smalloc(sizeof(int)*(nlinks+2));
             links[0] = index;
             links[1] = nlinks;
             rank = 0;
-            int count = 2;
+            count = 2;
             while (c)
             {
-                nlinks[count] =  ; //Possible remove has converged here
+                links[count] = c->page->index; //Possible remove has converged here
                 rank += (baseProb / noutlinks);
                 c = c->next;
                 count++;
             }
-            inlinks[p] = links;
+            nodes[p] = links;
             rank = jumpProb + (damp * rank);
             PrevRank[index] = rank;
             hasConverged[index] = 0;
@@ -181,9 +185,9 @@ void process_data(list *plist)
  * Update global PageRank and norm.
  * @param n node to be processed
  */
-double process_node(int page);
+double process_node(int page)
 {
-    int * links = inlinks[page];
+    int * links = nodes[page];
     int index = links[0];
     int nlinks = links[1];
     int c;
@@ -194,7 +198,7 @@ double process_node(int page);
         if((t = hasConverged[c])){
             rank += t;
         }else{
-            rank += (PrevRank[c]/noutlinks[c]);
+            rank += (PrevRank[c]/outlinks[c]);
         }
     }
     rank *= damp;
@@ -219,9 +223,9 @@ void tick(void)
 /**
  * Free all allocated data.
  */
-// void free_all(void)
-// {
-// }
+void free_all(void)
+{
+}
 
 /**
  * helper function to print nodes in plist
