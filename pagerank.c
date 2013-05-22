@@ -54,6 +54,7 @@ double *hasConverged;
 int *outlinks;
 int **nodes;
 int realPages;
+int allocedNodes;
 double damp;
 double pages;
 double cores;
@@ -175,7 +176,7 @@ void process_data(list *plist)
         curr = curr->next;
     }
     realPages = p;
-
+    allocedNodes = p;
 }
 
 /**
@@ -230,6 +231,26 @@ void tick(void)
  */
 void free_all(void)
 {
+    if (PageRank){
+        free(PageRank);
+    }
+    if (PrevRank){
+        free(PrevRank);
+    }
+    if (hasConverged){
+        free(hasConverged);
+    }
+    if (outlinks){
+        free(outlinks);
+    }
+    if(nodes){
+        for(int i = 0; i < allocedNodes; i++){
+            if(nodes[i]){
+                free(nodes[i]);
+            }
+        }
+        free(nodes);
+    }
 }
 
 /**
