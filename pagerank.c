@@ -8,21 +8,6 @@
 
 #include "pagerank.h"
 
-/////////////////////
-//Type Definitions //
-/////////////////////
-
-typedef struct SuperPage SuperPage;
-typedef struct Node Node;
-
-////////////////////////
-//Function Prototypes //
-////////////////////////
-
-/* pagerank.c */
-
-
-
 /////////////////////////////
 //GENERIC HELPER FUNCTIONS //
 /////////////////////////////
@@ -58,23 +43,6 @@ void *smalloc(size_t size)
     return res;
 }
 
-/**
- * Simple function to calculate the square of
- * the difference of 2 number
- * @param  curr current rank
- * @param  prev previous rank
- * @return      difference squared
- */
-double diff_squared(double curr, double prev)
-{
-    double temp = curr - prev;
-    return temp * temp;
-}
-
-
-
-
-
 ///////////////////////////////
 //PAGE RANK GLOBAL VARIABLES //
 ///////////////////////////////
@@ -82,7 +50,10 @@ double diff_squared(double curr, double prev)
 double *PageRank;
 double *PrevRank;
 double *TempRank;
-int *hasConverged;
+int * hasConverged;
+int * outlinks;
+int ** inlinks;
+int realPages;
 double damp;
 double pages;
 double cores;
@@ -105,23 +76,23 @@ double norm;
  * @param  void
  * @return      Next Node
  */
-Node *get_next(void)
-{
-    Node *prev = globalCurr;
-    if(globalCurr){
-        globalCurr = globalCurr->next;
-    }
-    return prev;
-}
+// Node *get_next(void)
+// {
+//     Node *prev = globalCurr;
+//     if(globalCurr){
+//         globalCurr = globalCurr->next;
+//     }
+//     return prev;
+// }
 
 /**
  * Resets the global node pointer to the head
  * of the list
  */
-void reset_next(void)
-{
-    globalCurr = Head->next;
-}
+// void reset_next(void)
+// {
+//     globalCurr = Head->next;
+// }
 
 /**
  * Declare and allocate required global variables
@@ -143,7 +114,9 @@ void init_globals(int ncores, int npages, int nedges, double dampener)
     PageRank = (double *)smalloc(sizeof(double) * pages);
     PrevRank = (double *)smalloc(sizeof(double) * pages);
     TempRank = NULL;
-    hasConverged = (int *)smalloc(sizeof(int) * pages);
+    hasConverged = (double *)smalloc(sizeof(double) * pages);
+    noutlinks = (int *)smalloc(sizeof(int) * pages);
+    nodes = (int **)smalloc(sizeof(int *) * pages);
     norm = 0;
 }
 
@@ -156,6 +129,46 @@ void init_globals(int ncores, int npages, int nedges, double dampener)
  */
 void process_data(list *plist)
 {
+    node *curr = plist->head;
+    node *c;
+    int index;
+    int p = 0;
+    double rank;
+    while (curr)
+    {
+        index = curr->page->index;
+        noutlinks = c->page->noutlinks;
+        if (curr->page->inlinks)  // Not dangling page
+        {
+            c = curr->page->inlinks->head;
+            nlinks = curr->page->inlinks->length;
+            outlinks[index] = noutlinks;
+            int * links = smalloc(sizeof(int)*(nlinks+2));
+            links[0] = index;
+            links[1] = nlinks;
+            rank = 0;
+            int count = 2;
+            while (c)
+            {
+                nlinks[count] =  ; //Possible remove has converged here
+                rank += (baseProb / noutlinks);
+                c = c->next;
+                count++;
+            }
+            inlinks[p] = links;
+            rank = jumpProb + (damp * rank);
+            PrevRank[index] = rank;
+            hasConverged[index] = 0;
+            p++;
+        }
+        else   // Dangling page
+        {
+            PrevRank[index] = jumpProb;
+            hasConverged[index] = jumpProb/noutlinks;
+        }
+        curr = curr->next;
+    }
+    realPages = p;
 
 }
 
@@ -168,9 +181,26 @@ void process_data(list *plist)
  * Update global PageRank and norm.
  * @param n node to be processed
  */
-void process_node(Node *n)
+double process_node(int page);
 {
-
+    int * links = inlinks[page];
+    int index = links[0];
+    int nlinks = links[1];
+    int c;
+    double t;
+    double rank = 0;
+    for(int i = 0; i < nlinks; i++){
+        c = links[i];
+        if((t = hasConverged[c])){
+            rank += t;
+        }else{
+            rank += (PrevRank[c]/noutlinks[c]);
+        }
+    }
+    rank *= damp;
+    rank += jumpProb;
+    rank = PrevRank[index] - rank;
+    return rank*rank;
 }
 
 /**
@@ -180,62 +210,18 @@ void process_node(Node *n)
  */
 void tick(void)
 {
-    Node *curr;
     norm = 0;
-    TempRank = PrevRank;
-    PrevRank = PageRank;
-    PageRank = TempRank;
-    reset_next();
-    while ((curr = get_next()))
-    {
-        process_node(curr);
+    for(int i = 0; i < realPages; i++){
+        norm += process_node(i);
     }
 }
 
 /**
  * Free all allocated data.
  */
-void free_all(void)
-{
-    if (PageRank)
-    {
-        free(PageRank);
-    }
-    if (PrevRank)
-    {
-        free(PrevRank);
-    }
-    if (hasConverged)
-    {
-        free(hasConverged);
-    }
-    if(Head){
-        Free_List(Head);
-    }
-    if (superPages)
-    {
-        for (int i = 0; i < pages; i++)
-        {
-            if (superPages[i])
-            {
-                SuperPage_free(superPages[i]);
-            }
-        }
-        free(superPages);
-    }
-}
-
-/**
- * Check the convergence of the ranks, by
- * comparing the epsilon value to the normal
- * square difference sum
- * @return return 1 if not converges
- * otherwise 0
- */
-int check_convergence()
-{
-    return (norm > epsilon);
-}
+// void free_all(void)
+// {
+// }
 
 /**
  * helper function to print nodes in plist
@@ -264,10 +250,10 @@ void print_nodes(list *plist)
  * @param npages number of pages in graph
  * @param nedges number of edges in graph
  */
-void edge_cases(list *plist, int npages, int nedges)
-{
-    //TODO
-}
+// void edge_cases(list *plist, int npages, int nedges)
+// {
+//     //TODO
+// }
 
 
 ///////////////////////
@@ -288,11 +274,10 @@ void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
     init_globals(ncores, npages, nedges, dampener);
     process_data(plist);
     // print_nodes(plist);
-    while (check_convergence())
-    {
+    do{
         tick();
         // print_nodes(plist);
-    }
+    } while ((*(int*)&epsilon < *(int*)&norm));
     print_nodes(plist);
     free_all();
 }
