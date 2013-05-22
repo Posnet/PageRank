@@ -216,13 +216,13 @@ double process_node(int page)
  */
 void tick(void)
 {
+    TempRank = PrevRank;
+    PrevRank = PageRank;
+    PageRank = TempRank;
     norm = 0;
     for(int i = 0; i < realPages; i++){
         norm += process_node(i);
     }
-    TempRank = PrevRank;
-    PrevRank = PageRank;
-    PageRank = TempRank;
 }
 
 /**
@@ -240,13 +240,13 @@ void free_all(void)
 void print_nodes(list *plist)
 {
     node *curr = plist->head;
-    printf("n: %f\n", norm);
+    // printf("n: %f\n", norm);
     while (curr)
     {
         printf("%s %.4f\n", curr->page->name, PageRank[curr->page->index]);
         curr = curr->next;
     }
-    printf("\n");
+    // printf("\n");
 }
 
 /**
@@ -282,10 +282,10 @@ void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
     //edge_cases(plist, ncores, npages);
     init_globals(ncores, npages, nedges, dampener);
     process_data(plist);
-    print_nodes(plist);
+    // print_nodes(plist);
     do{
         tick();
-        print_nodes(plist);
+        // print_nodes(plist);
     } while ((*(long int*)&epsilon < *(long int*)&norm));
     // }while(norm > epsilon);
     print_nodes(plist);
