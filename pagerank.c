@@ -141,7 +141,7 @@ void process_data(list *plist)
     while (curr)
     {
         index = curr->page->index;
-        noutlinks = c->page->noutlinks;
+        noutlinks = curr->page->noutlinks;
         if (curr->page->inlinks)  // Not dangling page
         {
             c = curr->page->inlinks->head;
@@ -154,20 +154,22 @@ void process_data(list *plist)
             count = 2;
             while (c)
             {
-                links[count] = c->page->index; //Possible remove has converged here
-                rank += (baseProb / noutlinks);
+                links[count] = c->page->index;
+                rank += (baseProb / c->page->noutlinks);
                 c = c->next;
                 count++;
             }
             nodes[p] = links;
             rank = jumpProb + (damp * rank);
             PrevRank[index] = rank;
+            PageRank[index] = rank;
             hasConverged[index] = 0;
             p++;
         }
         else   // Dangling page
         {
             PrevRank[index] = jumpProb;
+            PageRank[index] = jumpProb;
             hasConverged[index] = jumpProb/noutlinks;
         }
         curr = curr->next;
@@ -191,19 +193,19 @@ double process_node(int page)
     int index = links[0];
     int nlinks = links[1];
     int c;
-    double t;
     double rank = 0;
-    for(int i = 0; i < nlinks; i++){
+    for(int i = 2; i < nlinks+2; i++){
         c = links[i];
-        if((t = hasConverged[c])){
-            rank += t;
+        if((hasConverged[c])){
+            rank += hasConverged[c];
         }else{
             rank += (PrevRank[c]/outlinks[c]);
         }
     }
     rank *= damp;
     rank += jumpProb;
-    rank = PrevRank[index] - rank;
+    PageRank[index] = rank;
+    rank = rank - PrevRank[index];
     return rank*rank;
 }
 
@@ -218,6 +220,9 @@ void tick(void)
     for(int i = 0; i < realPages; i++){
         norm += process_node(i);
     }
+    TempRank = PrevRank;
+    PrevRank = PageRank;
+    PageRank = TempRank;
 }
 
 /**
@@ -281,7 +286,8 @@ void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
     do{
         tick();
         // print_nodes(plist);
-    } while ((*(int*)&epsilon < *(int*)&norm));
+    // } while ((*(int*)&epsilon < *(int*)&norm));
+    }while(norm > epsilon);
     print_nodes(plist);
     free_all();
 }
