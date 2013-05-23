@@ -109,11 +109,11 @@ void process_data(list *plist)
     {
         index = curr->page->index;
         noutlinks = damp/curr->page->noutlinks;
+        outlinks[index] = noutlinks;
         if (curr->page->inlinks)  // Not dangling page
         {
             c = curr->page->inlinks->head;
             nlinks = curr->page->inlinks->length;
-            outlinks[index] = noutlinks;
             // printf("%f\n", outlinks[index]);
             links = (int *)malloc(sizeof(int)*(nlinks+2));
             links[0] = index;
@@ -289,7 +289,7 @@ void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
     do{
         tick();
         // print_nodes(plist);
-    } while ((*(int*)&epsilon < *(int*)&norm) && realPages);
+    } while ((*(long int*)&epsilon < *(long int*)&norm) && realPages);
     print_nodes(plist);
     free_all();
 }
