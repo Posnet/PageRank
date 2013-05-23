@@ -12,22 +12,22 @@
 //PAGE RANK GLOBAL VARIABLES //
 ///////////////////////////////
 
-double *PageRank;
-double *PrevRank;
-double *TempRank;
-double *hasConverged;
-double *partialSum;
-int *outlinks;
+float *PageRank;
+float *PrevRank;
+float *TempRank;
+float *hasConverged;
+float *partialSum;
+float *outlinks;
 int **nodes;
 int realPages;
-double damp;
-double pages;
-double cores;
-double edges;
-double jumpProb;
-double baseProb;
-double epsilon = EPSILON * EPSILON;
-double norm;
+float damp;
+float pages;
+float cores;
+float edges;
+float jumpProb;
+float baseProb;
+float epsilon = EPSILON * EPSILON;
+float norm;
 
 
 ///////////////////////////////
@@ -67,7 +67,7 @@ double norm;
  * @param nedges   number of edges
  * @param dampener dampener ratio
  */
-void init_globals(int ncores, int npages, int nedges, double dampener)
+void init_globals(int ncores, int npages, int nedges, float dampener)
 {
     //Init Globals
     damp = dampener;
@@ -77,12 +77,12 @@ void init_globals(int ncores, int npages, int nedges, double dampener)
     jumpProb = ((1.0 - damp) / pages);
     baseProb = 1.0 / npages;
 
-    PageRank = (double *)malloc(sizeof(double) * pages);
-    PrevRank = (double *)malloc(sizeof(double) * pages);
+    PageRank = (float *)malloc(sizeof(float) * pages);
+    PrevRank = (float *)malloc(sizeof(float) * pages);
     TempRank = NULL;
-    hasConverged = (double *)malloc(sizeof(double) * pages);
-    partialSum = (double *)malloc(sizeof(double) * pages);
-    outlinks = (int *)malloc(sizeof(int) * pages);
+    hasConverged = (float *)malloc(sizeof(float) * pages);
+    partialSum = (float *)malloc(sizeof(float) * pages);
+    outlinks = (float *)malloc(sizeof(float) * pages);
     nodes = (int **)malloc(sizeof(int *) * pages);
     norm = 0;
 }
@@ -100,20 +100,21 @@ void process_data(list *plist)
     node *c;
     int index;
     int p = 0;
-    int noutlinks;
+    float noutlinks;
     int count;
     int nlinks;
     int *links;
-    double rank;
+    float rank;
     while (curr)
     {
         index = curr->page->index;
-        noutlinks = curr->page->noutlinks;
+        noutlinks = damp/curr->page->noutlinks;
         if (curr->page->inlinks)  // Not dangling page
         {
             c = curr->page->inlinks->head;
             nlinks = curr->page->inlinks->length;
             outlinks[index] = noutlinks;
+            // printf("%f\n", outlinks[index]);
             links = (int *)malloc(sizeof(int)*(nlinks+2));
             links[0] = index;
             links[1] = nlinks;
@@ -122,7 +123,7 @@ void process_data(list *plist)
             while (c)
             {
                 links[count] = c->page->index;
-                rank += (baseProb / c->page->noutlinks);
+                rank += (baseProb * (1.0/c->page->noutlinks));
                 c = c->next;
                 count++;
             }
@@ -138,7 +139,7 @@ void process_data(list *plist)
         {
             PrevRank[index] = jumpProb;
             PageRank[index] = jumpProb;
-            hasConverged[index] = jumpProb/noutlinks;
+            hasConverged[index] = (jumpProb * noutlinks);
         }
         curr = curr->next;
     }
@@ -154,36 +155,37 @@ void process_data(list *plist)
  * Update global PageRank and norm.
  * @param n node to be processed
  */
-double process_node(int p)
+void process_node(int p)
 {
     int * links = nodes[p];
     int index = links[0];
     int nlinks = links[1];
     int c;
-    double rank = 0;
-    double ps = partialSum[index];
+    float rank = 0;
+    float ps = partialSum[index];
     for(int i = 2; i < nlinks+2; i++){
         c = links[i];
         if((hasConverged[c])){
+            // rank += hasConverged[c];
             ps += hasConverged[c];
             links[i] = links[nlinks+1];
             links[1]--;
         }else{
-            rank += (PrevRank[c]/outlinks[c]);
+            rank += (PrevRank[c] * outlinks[c]);
         }
     }
-    rank = jumpProb + (damp*(rank+ps));
+    rank = jumpProb + (rank + ps);
     partialSum[index] = ps;
     PageRank[index] = rank;
     if(links[1] == 0){
         free(nodes[p]);
         nodes[p] = nodes[realPages-1];
         realPages--;
-        hasConverged[index] = rank/outlinks[index];
+        hasConverged[index] = rank * outlinks[index];
         PrevRank[index] = rank;
     }
     rank = rank - PrevRank[index];
-    return  rank * rank;
+    norm += rank * rank;
 }
 
 /**
@@ -199,7 +201,7 @@ void tick(void)
     norm = 0;
     int tempPages = realPages;
     for(int i = 0; i < tempPages; i++){
-        // norm += process_node(i);
+        process_node(i);
     }
 }
 
@@ -278,7 +280,7 @@ void print_nodes(list *plist)
  * @param nedges   number of edges
  * @param dampener dampener
  */
-void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
+void pagerank(list *plist, int ncores, int npages, int nedges, float dampener)
 {
     //edge_cases(plist, ncores, npages);
     init_globals(ncores, npages, nedges, dampener);
@@ -287,7 +289,7 @@ void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
     do{
         tick();
         // print_nodes(plist);
-    } while ((*(long int*)&epsilon < *(long int*)&norm) && realPages);
+    } while ((*(int*)&epsilon < *(int*)&norm) && realPages);
     print_nodes(plist);
     free_all();
 }
