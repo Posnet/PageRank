@@ -161,17 +161,19 @@ double process_node(int p)
     int nlinks = links[1];
     int c;
     double rank = 0;
+    double ps = partialSum[index];
     for(int i = 2; i < nlinks+2; i++){
         c = links[i];
         if((hasConverged[c])){
-            partialSum[c] += hasConverged[c];
+            ps += hasConverged[c];
             links[i] = links[nlinks+1];
             links[1]--;
         }else{
             rank += (PrevRank[c]/outlinks[c]);
         }
     }
-    rank = jumpProb + (damp*rank);
+    rank = jumpProb + (damp*(rank+ps));
+    partialSum[index] = ps;
     PageRank[index] = rank;
     if(links[1] == 0){
         free(nodes[p]);
@@ -195,8 +197,9 @@ void tick(void)
     PrevRank = PageRank;
     PageRank = TempRank;
     norm = 0;
-    for(int i = 0; i < realPages; i++){
-        norm += process_node(i);
+    int tempPages = realPages;
+    for(int i = 0; i < tempPages; i++){
+        // norm += process_node(i);
     }
 }
 
