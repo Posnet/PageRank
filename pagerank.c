@@ -8,9 +8,77 @@
 
 #include "pagerank.h"
 
+////////////
+//Globals //
+////////////
+
+int **nodes;
+double *PageRank;
+double *PrevRank;
+double *outlinks;
+double *TempRank = NULL;
+double epsilon   = EPSILON * EPSILON;
+double jumpProb;
+double norm = 1;
+int gnpages;
+int gnthreads;
+pthread_barrier_t threadSync;
+pthread_mutex_t threadLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t normLock = PTHREAD_MUTEX_INITIALIZER;
+
+
 ///////////////////////
 //MAIN PAGERANK WORK //
 ///////////////////////
+
+/**
+ * pagerank worker function
+ * @param id worker id
+ */
+extern inline void * worker(void * id){
+    int pn, cp, il, index, nlinks, limit;
+    int threadID = (int )id;
+    int lnpages = gnpages;
+    int nthreads = gnthreads;
+    double localnorm = 1;
+    register int *links;
+    register double rank;
+    pthread_barrier_wait(&threadSync);
+    while (*(long int*)&epsilon < *(long int*)&norm){
+        pthread_barrier_wait(&threadSync);
+        pthread_mutex_lock(&threadLock);
+        if(norm != 0){
+        TempRank = PrevRank;
+        PrevRank = PageRank;
+        PageRank = TempRank;
+        norm = 0;
+        }
+        pthread_mutex_unlock(&threadLock);
+        pthread_barrier_wait(&threadSync);
+        localnorm = 0;
+        for(pn = threadID; pn < lnpages; pn += nthreads){
+            links = nodes[pn];
+            index = links[0];
+            nlinks = links[1];
+            limit = nlinks + 2;
+            rank = 0;
+            for(il = 2; il < limit; il++){
+                cp = links[il];
+                rank += (PrevRank[cp] * outlinks[cp]);
+            }
+            rank += jumpProb;
+            PageRank[index] = rank;
+            rank = rank - PrevRank[index];
+            localnorm += rank * rank;
+        }
+
+        pthread_mutex_lock(&normLock);
+        norm += localnorm;
+        pthread_mutex_unlock(&normLock);
+        pthread_barrier_wait(&threadSync);
+    }
+    return NULL;
+}
 
 /**
  * Main pagerank function
@@ -22,19 +90,25 @@
  */
 extern inline void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
 {
-    int **nodes = (int **)malloc(sizeof(int *) * npages);
-    double *PageRank = (double *)malloc(sizeof(double) * npages);
-    register double *PrevRank = (double *)malloc(sizeof(double) * npages);
-    register double *outlinks = (double *)malloc(sizeof(double) * npages);
-    double *TempRank = NULL;
-    double epsilon   = EPSILON * EPSILON;
-    double jumpProb  = ((1.0 - dampener) / npages);
     double baseProb  = 1.0 / npages;
-    double norm = 0;
-    register double noutlinks, rank;
-    register int index, il, pn, count, nlinks, limit, cp;
     int p = 0;
+    int nthreads = 1;
+    if (npages > 1000){
+        nthreads = ncores;
+    }
+    // nthreads = 8;
+    int edgeAvg = nedges;
+    gnthreads = nthreads;
+    nodes = (int **)malloc(sizeof(int *) * npages);
+    PageRank = (double *)malloc(sizeof(double) * npages);
+    PrevRank = (double *)malloc(sizeof(double) * npages);
+    outlinks = (double *)malloc(sizeof(double) * npages);
+    jumpProb  = ((1.0 - dampener) / npages);
+    pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t)*nthreads);
+    register double noutlinks, rank;
+    register int index, pn, count, nlinks, i;
     register int * links;
+    pthread_barrier_init(&threadSync, NULL, nthreads);
 
     register node *curr = plist->head;
     node *c;
@@ -73,33 +147,17 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
         }
         curr = curr->next;
     }
-    npages = p;
+    gnpages = p;
     // printf("%d\n", npages);
 
     // print_nodes(plist);
-    do{
-        TempRank = PrevRank;
-        PrevRank = PageRank;
-        PageRank = TempRank;
-        norm = 0;
-        for(pn = 0; pn < npages; pn++){
-            links = nodes[pn];
-            index = links[0];
-            nlinks = links[1];
-            limit = nlinks + 2;
-            rank = 0;
-            for(il = 2; il < limit; il++){
-                cp = links[il];
-                rank += (PrevRank[cp] * outlinks[cp]);
-            }
-            rank += jumpProb;
-            PageRank[index] = rank;
-            rank = rank - PrevRank[index];
-            norm += rank * rank;
-        }
-    } while (*(long int*)&epsilon < *(long int*)&norm);
 
-
+    for (i = 0; i<nthreads; i++){
+        pthread_create(&threads[i], NULL, worker, (void *)i);
+    }
+    for (i = 0; i<nthreads; i++){
+        pthread_join(threads[i], NULL);
+    }
 
     curr = plist->head;
     // printf("n: %f\n", norm);
@@ -109,7 +167,8 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
         curr = curr->next;
     }
 
-
+    pthread_mutex_destroy(&threadLock);
+    pthread_barrier_destroy(&threadSync);
     if (PageRank){
         free(PageRank);
     }
@@ -118,6 +177,9 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
     }
     if (outlinks){
         free(outlinks);
+    }
+    if (threads){
+        free(threads);
     }
     if(nodes){
         for(pn = 0; pn < npages; pn++){
