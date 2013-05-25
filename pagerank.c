@@ -93,9 +93,9 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
     double baseProb  = 1.0 / npages;
     int p = 0;
     int nthreads = 1;
-    if (npages > 1000){
+    // if (){
         nthreads = ncores;
-    }
+    // }
     // nthreads = 8;
     int edgeAvg = nedges;
     gnthreads = nthreads;
