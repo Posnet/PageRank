@@ -25,9 +25,9 @@ int gnthreads;
 int thread_done = 0;
 double *local_norms;
 
-pthread_barrier_t threadSync;
 pthread_mutex_t threadLock = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t normLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t thread_cond = PTHREAD_COND_INITIALIZER;
+
 
 
 ///////////////////////
@@ -72,20 +72,19 @@ static inline void *worker(void *id)
         local_norms[threadID] = localnorm;
         pthread_mutex_lock(&threadLock);
         thread_done++;
-
-        if (thread_done == localgnthreads)
-        {
+        if(thread_done != gnthreads){
+            pthread_cond_wait(&thread_cond, &threadLock);
+        }else{
             TempRank = PrevRank;
             PrevRank = PageRank;
             PageRank = TempRank;
             thread_done = 0;
             norm = 0;
             for (il = 0; il < localgnthreads; il++)
-                norm += local_norms[il];
+            norm += local_norms[il];
+            pthread_cond_broadcast(&thread_cond);
         }
-
         pthread_mutex_unlock(&threadLock);
-        pthread_barrier_wait(&threadSync);
     }
     return NULL;
 }
@@ -127,7 +126,6 @@ static inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
         edges[i] = 0;
         lnpages[i] = 0;
     }
-    pthread_barrier_init(&threadSync, NULL, nthreads);
 
     node *curr = plist->head;
     node *c;
@@ -200,7 +198,7 @@ static inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
     }
 
     pthread_mutex_destroy(&threadLock);
-    pthread_barrier_destroy(&threadSync);
+    pthread_cond_destroy(&thread_cond);
 
     if (nodes)
     {
