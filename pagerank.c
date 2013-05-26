@@ -36,12 +36,12 @@ pthread_mutex_t normLock = PTHREAD_MUTEX_INITIALIZER;
 
 static inline void *worker(void *id)
 {
-    int threadID = (int )id;
-    int lnpages = gnpages[threadID];
+    const int threadID = (int )id;
+    const int lnpages = gnpages[threadID];
     int **local_nodes = nodes[threadID];
     register int *links;
     int pn, cp, il, index, nlinks, limit;
-    int localgnthreads = gnthreads;
+    const int localgnthreads = gnthreads;
     register const double ljumpprob = jumpProb;
     // register double lepsilon = epsilon;
     register double rank;
