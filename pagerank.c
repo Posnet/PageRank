@@ -167,7 +167,7 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
     // if (){
     nthreads = ncores;
     // }
-    nthreads = 1;
+    // nthreads = 1;
     int edgeAvg = nedges;
     gnthreads = nthreads;
     // nodes = (int **)malloc(sizeof(int *) * npages);
