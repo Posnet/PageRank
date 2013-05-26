@@ -41,13 +41,14 @@ static inline void *worker(void *id)
     register int *links;
     int pn, cp, il, index, nlinks, limit;
     const int localgnthreads = gnthreads;
+    const double lepsilon = epsilon;
     register const double ljumpprob = jumpProb;
     // register double lepsilon = epsilon;
     register double rank;
     register double localnorm;
 
-    while (*(long int *)&epsilon < * (long int *)&norm)
-    // while (norm > lepsilon)
+    // while (*(long int *)&lepsilon < * (long int *)&norm)
+    while (norm > lepsilon)
     {
         localnorm = 0;
         for (pn = 0; pn < lnpages; pn++)
