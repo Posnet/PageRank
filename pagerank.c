@@ -261,14 +261,14 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
     // if (threads){
     //     free(threads);
     // }
-    // if(nodes){
-    //     for(pn = 0; pn < npages; pn++){
-    //         if(nodes[pn]){
-    //             free(nodes[pn]);
-    //         }
-    //     }
-    //     // free(nodes);
-    // }
+    if(nodes){
+        for(pn = 0; pn < npages; pn++){
+            // if(nodes[pn]){
+                free(nodes[pn]);
+            // }
+        }
+        // free(nodes);
+    }
 }
 
 ////////////////
