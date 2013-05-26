@@ -198,18 +198,7 @@ static inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
 
     pthread_mutex_destroy(&threadLock);
     pthread_barrier_destroy(&threadSync);
-    // if (PageRank){
-    //     free(PageRank);
-    // }
-    // if (PrevRank){
-    //     free(PrevRank);
-    // }
-    // if (outlinks){
-    //     free(outlinks);
-    // }
-    // if (threads){
-    //     free(threads);
-    // }
+
     if (nodes)
     {
         for (i = 0; i < nthreads; i++)
