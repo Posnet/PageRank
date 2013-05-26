@@ -102,8 +102,7 @@ static inline void *worker(void *id)
 static inline void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
 {
     const double baseProb  = 1.0 / npages;
-    int nthreads = 1;
-    nthreads = ncores;
+    const int nthreads = ncores;
 
     gnthreads = nthreads;
     int **lnodes[nthreads];
