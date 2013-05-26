@@ -29,6 +29,7 @@ double *local_norms;
 pthread_barrier_t threadSync;
 pthread_mutex_t threadLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t normLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t thread_cond = PTHREAD_COND_INITIALIZER;
 
 
 ///////////////////////
@@ -112,12 +113,12 @@ extern inline void * worker(void * id){
            rank = rank - PrevRank[index];
            localnorm += rank * rank;
        }
-
-       pthread_mutex_lock(&threadLock);
         local_norms[threadID] = localnorm;
+        pthread_mutex_lock(&threadLock);
         thread_done++;
-
-       if(thread_done == gnthreads){
+        if(thread_done != gnthreads){
+            pthread_cond_wait(&thread_cond, &threadLock);
+        }else{
             TempRank = PrevRank;
             PrevRank = PageRank;
             PageRank = TempRank;
@@ -125,10 +126,9 @@ extern inline void * worker(void * id){
             norm = 0;
             for (i = 0; i < gnthreads; i++)
             norm += local_norms[i];
+            pthread_cond_broadcast(&thread_cond);
         }
-
-       pthread_mutex_unlock(&threadLock);
-       pthread_barrier_wait(&threadSync);
+        pthread_mutex_unlock(&threadLock);
    }
    return NULL;
 }
@@ -189,7 +189,7 @@ static inline void pagerank1(list *plist, int ncores, int npages, int nedges, do
     npages = p;
     // printf("%d\n", npages);
 
-    // print_nodes(plist);
+    // print_nodes(plist);6
     do{
         TempRank = PrevRank;
         PrevRank = PageRank;
@@ -360,6 +360,7 @@ static inline void pagerank2(list *plist, int ncores, int npages, int nedges, do
 
     pthread_mutex_destroy(&threadLock);
     pthread_barrier_destroy(&threadSync);
+    pthread_cond_destroy(&thread_cond);
     // if (PageRank){
     //     free(PageRank);
     // }
