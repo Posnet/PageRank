@@ -250,6 +250,7 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
     // print_nodes(plist);
 
     for (i = 0; i<nthreads; i++){
+        printf("thread: %d has %d pages and %d edges\n", i, lnpages[i], edges[i]);
         pthread_create(&threads[i], NULL, worker, (void *)i);
     }
     for (i = 0; i<nthreads; i++){
