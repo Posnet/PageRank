@@ -12,7 +12,7 @@
 //Globals //
 ////////////
 
-int **nodes;
+int ***nodes;
 double *PageRank;
 double *PrevRank;
 double *outlinks;
@@ -20,7 +20,7 @@ double *TempRank = NULL;
 double epsilon   = EPSILON * EPSILON;
 double jumpProb;
 double norm = 1;
-int gnpages;
+int * gnpages;
 int gnthreads;
 pthread_barrier_t threadSync;
 pthread_mutex_t threadLock = PTHREAD_MUTEX_INITIALIZER;
@@ -36,13 +36,14 @@ pthread_mutex_t normLock = PTHREAD_MUTEX_INITIALIZER;
  * @param id worker id
  */
 extern inline void * worker(void * id){
-    int pn, cp, il, index, nlinks, limit;
     int threadID = (int )id;
-    int lnpages = gnpages;
-    int nthreads = gnthreads;
+
+    int lnpages = gnpages[threadID];
+    int ** local_nodes = nodes[threadID];
+    int *links;
+    int pn, cp, il, index, nlinks, limit;
+    double rank;
     double localnorm = 1;
-    register int *links;
-    register double rank;
     pthread_barrier_wait(&threadSync);
     while (*(long int*)&epsilon < *(long int*)&norm){
         pthread_barrier_wait(&threadSync);
@@ -56,8 +57,8 @@ extern inline void * worker(void * id){
         pthread_mutex_unlock(&threadLock);
         pthread_barrier_wait(&threadSync);
         localnorm = 0;
-        for(pn = threadID; pn < lnpages; pn += nthreads){
-            links = nodes[pn];
+        for(pn = 0; pn < lnpages; pn++){
+            links = local_nodes[pn];
             index = links[0];
             nlinks = links[1];
             limit = nlinks + 2;
@@ -162,33 +163,39 @@ extern inline void * worker(void * id){
 extern inline void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
 {
     double baseProb  = 1.0 / npages;
-    int p = 0;
     int nthreads = 1;
     // if (){
     nthreads = ncores;
     // }
     // nthreads = 1;
-    int edgeAvg = nedges;
+
     gnthreads = nthreads;
     // nodes = (int **)malloc(sizeof(int *) * npages);
     // PageRank = (double *)malloc(sizeof(double) * npages);
     // PrevRank = (double *)malloc(sizeof(double) * npages);
     // outlinks = (double *)malloc(sizeof(double) * npages);
-    int * lnodes[npages];
+    int ** lnodes[nthreads];
     nodes = &lnodes[0];
     double storage_array[3*npages];
+    int edges[nthreads];
     PageRank = &storage_array[0];
     PrevRank = &storage_array[npages];
     outlinks = &storage_array[2*npages];
     jumpProb  = ((1.0 - dampener) / npages);
     // pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t)*nthreads);
     pthread_t threads[nthreads];
-    register double noutlinks, rank;
-    register int index, pn, count, nlinks, i;
+    int lnpages[nthreads];
+    double noutlinks, rank;
+    int index, pn, count, nlinks, i, mi, min;
     int * links;
+    for (i = 0; i < nthreads; i++){
+        nodes[i] = (int **)malloc(sizeof(int *)*npages);
+        edges[i] = 0;
+        lnpages[i] = 0;
+    }
     pthread_barrier_init(&threadSync, NULL, nthreads);
 
-    register node *curr = plist->head;
+    node *curr = plist->head;
     node *c;
 
     while (curr)
@@ -214,11 +221,21 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
                 c = c->next;
                 count++;
             }
-            nodes[p] = links;
+
+            min = edges[0];
+            mi = 0;
+            for(i = 1; i < nthreads; i++){
+                if (edges[i] < min){
+                    min = edges[i];
+                    mi = i;
+                }
+            }
+            nodes[mi][lnpages[mi]] = links;
+            edges[mi] += nlinks;
+            lnpages[mi] += 1;
             rank = jumpProb + (dampener * rank);
             PrevRank[index] = rank;
             PageRank[index] = rank;
-            p++;
         }
         else   // Dangling page
         {
@@ -227,7 +244,7 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
         }
         curr = curr->next;
     }
-    gnpages = p;
+    gnpages = &lnpages[0];
     // printf("%d\n", npages);
 
     // print_nodes(plist);
@@ -262,12 +279,17 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
     //     free(threads);
     // }
     if(nodes){
-        for(pn = 0; pn < gnpages; pn++){
-            if(nodes[pn] != (void *)0){
-                free(nodes[pn]);
+        for (i = 0; i < nthreads; i++){
+            if(nodes[i]){
+                for(pn = 0; pn < lnpages[i]; pn++){
+                    if(nodes[i][pn]){
+                        free(nodes[i][pn]);
+                    }
+
+                }
+            free(nodes[i]);
             }
         }
-        // free(nodes);
     }
 }
 
