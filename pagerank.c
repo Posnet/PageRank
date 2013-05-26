@@ -17,7 +17,7 @@ double *PageRank;
 double *PrevRank;
 double *outlinks;
 double *TempRank = NULL;
-double epsilon   = EPSILON * EPSILON;
+const double epsilon   = EPSILON * EPSILON;
 double jumpProb;
 double norm = 1;
 int *gnpages;
@@ -42,10 +42,13 @@ static inline void *worker(void *id)
     register int *links;
     int pn, cp, il, index, nlinks, limit;
     int localgnthreads = gnthreads;
+    register const double ljumpprob = jumpProb;
+    // register double lepsilon = epsilon;
     register double rank;
     register double localnorm;
 
     while (*(long int *)&epsilon < * (long int *)&norm)
+    // while (norm > lepsilon)
     {
         localnorm = 0;
         for (pn = 0; pn < lnpages; pn++)
@@ -60,7 +63,7 @@ static inline void *worker(void *id)
                 cp = links[il];
                 rank += (PrevRank[cp] * outlinks[cp]);
             }
-            rank += jumpProb;
+            rank += ljumpprob;
             PageRank[index] = rank;
             rank = rank - PrevRank[index];
             localnorm += rank * rank;
@@ -98,7 +101,7 @@ static inline void *worker(void *id)
  */
 static inline void pagerank(list *plist, int ncores, int npages, int nedges, double dampener)
 {
-    double baseProb  = 1.0 / npages;
+    const double baseProb  = 1.0 / npages;
     int nthreads = 1;
     nthreads = ncores;
 
