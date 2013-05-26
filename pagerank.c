@@ -80,6 +80,77 @@ extern inline void * worker(void * id){
     return NULL;
 }
 
+// extern inline void * worker(void * id)
+// {
+//   int pn, cp;
+//   int nlinks;
+//   int *links;
+//   int limit;
+//   int lid = (int)id;
+//   signed int il;
+//   int lnthreads;
+//   register double rank;
+//   double localnorm = 0;
+//   int lnpages;
+//   int index;
+
+//   lnthreads = gnthreads;
+//   lnpages = gnpages;
+//   while ( 1 )
+//   {
+//     pthread_barrier_wait(&threadSync);
+//     if (*(long int*)&norm < *(long int*)&epsilon)
+//       break;
+//     pthread_barrier_wait(&threadSync);
+//     pthread_mutex_lock(&threadLock);
+//     if(!norm)
+//     {
+//       TempRank = PrevRank;
+//       PrevRank = PageRank;
+//       PageRank = TempRank;
+//       norm = 0;
+//     }
+//     pthread_mutex_unlock(&threadLock);
+//     pthread_barrier_wait(&threadSync);
+//     if ( lid < lnpages )
+//     {
+//       local_outlinks = outlinks;
+//       local_prevrank = PrevRank;
+//       localnodes = nodes;
+//       pn = lid;
+//       do
+//       {
+//         links = localnodes[pn];
+//         index = links[0];
+//         nlinks = links[1];
+//         if ( nlinks > 0 )
+//         {
+//           il = 2;
+//           limit = nlinks + 2;
+//           do
+//           {
+//             cp = links[il];
+//             rank += local_prevrank[cp] * local_outlinks[cp];
+//             ++il;
+//           }
+//           while ( il < limit );
+//         }
+//         rank += local_jumprob;
+//         PageRank[index] = rank;
+//         rank = rank - local_prevrank[index];
+//         localnorm += rank * rank;
+//         pn += lnthreads;
+//       }
+//       while ( pn < lnpages );
+//     }
+//     pthread_mutex_lock(&normLock);
+//     norm += localnorm;
+//     pthread_mutex_unlock(&normLock);
+//     // pthread_barrier_wait(&threadSync);
+//   }
+//   return 0;
+// }
+
 /**
  * Main pagerank function
  * @param plist    list of pages
@@ -94,20 +165,27 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
     int p = 0;
     int nthreads = 1;
     // if (){
-        nthreads = ncores;
+    nthreads = ncores;
     // }
-    // nthreads = 8;
+    nthreads = 1;
     int edgeAvg = nedges;
     gnthreads = nthreads;
-    nodes = (int **)malloc(sizeof(int *) * npages);
-    PageRank = (double *)malloc(sizeof(double) * npages);
-    PrevRank = (double *)malloc(sizeof(double) * npages);
-    outlinks = (double *)malloc(sizeof(double) * npages);
+    // nodes = (int **)malloc(sizeof(int *) * npages);
+    // PageRank = (double *)malloc(sizeof(double) * npages);
+    // PrevRank = (double *)malloc(sizeof(double) * npages);
+    // outlinks = (double *)malloc(sizeof(double) * npages);
+    int * lnodes[npages];
+    nodes = &lnodes[0];
+    double storage_array[3*npages];
+    PageRank = &storage_array[0];
+    PrevRank = &storage_array[npages];
+    outlinks = &storage_array[2*npages];
     jumpProb  = ((1.0 - dampener) / npages);
-    pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t)*nthreads);
+    // pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t)*nthreads);
+    pthread_t threads[nthreads];
     register double noutlinks, rank;
     register int index, pn, count, nlinks, i;
-    register int * links;
+    int * links;
     pthread_barrier_init(&threadSync, NULL, nthreads);
 
     register node *curr = plist->head;
@@ -122,7 +200,9 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
         {
             c = curr->page->inlinks->head;
             nlinks = curr->page->inlinks->length;
-            links = (int *)malloc(sizeof(int)*(nlinks+2));
+            // int links[nlinks+2];
+            // links = &lt[0];
+            links = malloc(sizeof(int)*(nlinks+2));
             links[0] = index;
             links[1] = nlinks;
             rank = 0;
@@ -169,26 +249,26 @@ extern inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
 
     pthread_mutex_destroy(&threadLock);
     pthread_barrier_destroy(&threadSync);
-    if (PageRank){
-        free(PageRank);
-    }
-    if (PrevRank){
-        free(PrevRank);
-    }
-    if (outlinks){
-        free(outlinks);
-    }
-    if (threads){
-        free(threads);
-    }
-    if(nodes){
-        for(pn = 0; pn < npages; pn++){
-            if(nodes[pn]){
-                free(nodes[pn]);
-            }
-        }
-        free(nodes);
-    }
+    // if (PageRank){
+    //     free(PageRank);
+    // }
+    // if (PrevRank){
+    //     free(PrevRank);
+    // }
+    // if (outlinks){
+    //     free(outlinks);
+    // }
+    // if (threads){
+    //     free(threads);
+    // }
+    // if(nodes){
+    //     for(pn = 0; pn < npages; pn++){
+    //         if(nodes[pn]){
+    //             free(nodes[pn]);
+    //         }
+    //     }
+    //     // free(nodes);
+    // }
 }
 
 ////////////////
