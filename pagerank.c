@@ -66,8 +66,8 @@ static inline void *worker(void *id)
             localnorm += rank * rank;
         }
 
-        pthread_mutex_lock(&threadLock);
         local_norms[threadID] = localnorm;
+        pthread_mutex_lock(&threadLock);
         thread_done++;
 
         if (thread_done == localgnthreads)
@@ -181,6 +181,7 @@ static inline void pagerank(list *plist, int ncores, int npages, int nedges, dou
 
     for (i = 0; i < nthreads; i++)
     {
+        nodes[i] = (int**)realloc(nodes[i], (sizeof(int *)*lnpages[i]));
         pthread_create(&threads[i], NULL, worker, (void *)i);
     }
     for (i = 0; i < nthreads; i++)
